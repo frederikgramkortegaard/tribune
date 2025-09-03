@@ -24,10 +24,9 @@ FetchContent_MakeAvailable(httplib nlohmann_json)
 # Include directories
 include_directories(include)
 
-# Server executable  
-add_executable(server_app apps/server_app.cpp src/server/tribune_server.cpp src/server/client_state.cpp src/protocol/parser.cpp)
+# Example applications
+add_executable(server_app apps/example/server_app.cpp src/server/tribune_server.cpp src/server/client_state.cpp src/protocol/parser.cpp)
 target_link_libraries(server_app PRIVATE httplib::httplib nlohmann_json::nlohmann_json)
 
-# Client executable
-add_executable(client_app apps/client_app.cpp src/client/tribune_client.cpp src/client/data_collection_module.cpp src/protocol/parser.cpp)
+add_executable(client_app apps/example/client_app.cpp src/client/tribune_client.cpp src/client/data_collection_module.cpp src/protocol/parser.cpp)
 target_link_libraries(client_app PRIVATE httplib::httplib nlohmann_json::nlohmann_json)
