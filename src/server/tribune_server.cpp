@@ -3,8 +3,8 @@
 #include <format>
 #include <iostream>
 
-TribuneServer::TribuneServer(const std::string &host, int port)
-    : host(host), port(port) {
+TribuneServer::TribuneServer(const std::string &host, int port, const ServerConfig& config)
+    : config_(config), host(host), port(port), rng_(rd_()) {
   setupRoutes();
 }
 void TribuneServer::start() {
@@ -122,23 +122,82 @@ void TribuneServer::handleEndpointSubmit(const httplib::Request &req,
   }
 }
 
-void TribuneServer::announceEvent(const Event event) {
+void TribuneServer::announceEvent(const Event& event) {
   // Convert Event to JSON string using automatic conversion
   nlohmann::json j = event;
   std::string json_str = j.dump();
 
-  std::cout << "Announcing Event: " << event.event_id << std::endl;
-  for (const auto &[id, state] : this->roster) {
-    if (state.isClientParticipating()) {
-      httplib::Client cli(state.client_host, std::stoi(state.client_port));
-      auto res = cli.Post("/event", json_str, "application/json");
+  std::cout << "Announcing event " << event.event_id << " to " 
+            << event.participants.size() << " participants" << std::endl;
 
-      if (res) {
-        std::cout << "Sent Event with ID: " << event.event_id
-                  << ", to Client: " << state.client_host << ":"
-                  << state.client_port << " who accepted it" << std::endl;
-      }
+  for (const auto& participant : event.participants) {
+    httplib::Client cli(participant.client_host, std::stoi(participant.client_port));
+    auto res = cli.Post("/event", json_str, "application/json");
+
+    if (res && res->status == 200) {
+      std::cout << "Sent Event with ID: " << event.event_id
+                << ", to Client: " << participant.client_host << ":"
+                << participant.client_port << " - Status: " << res->status << std::endl;
+    } else {
+      std::cout << "Failed to send Event to Client: " << participant.client_host 
+                << ":" << participant.client_port << std::endl;
     }
   }
+}
+
+std::vector<ClientInfo> TribuneServer::selectParticipants() {
+  // Get all active participating clients
+  std::vector<ClientInfo> active_clients;
+  
+  for (const auto& [client_id, client_state] : roster) {
+    if (client_state.isClientParticipating()) {
+      ClientInfo info;
+      info.client_id = client_state.client_id;
+      info.client_host = client_state.client_host;
+      info.client_port = client_state.client_port;
+      active_clients.push_back(info);
+    }
+  }
+  
+  std::cout << "Found " << active_clients.size() << " active clients" << std::endl;
+  
+  // Check minimum threshold
+  if (static_cast<int>(active_clients.size()) < config_.min_participants) {
+    std::cout << "Not enough participants (" << active_clients.size() 
+              << " < " << config_.min_participants << ")" << std::endl;
+    return {};
+  }
+  
+  // Determine participant count
+  int participant_count = std::min(
+    static_cast<int>(active_clients.size()),
+    config_.max_participants
+  );
+  
+  // Random selection
+  std::shuffle(active_clients.begin(), active_clients.end(), rng_);
+  
+  std::vector<ClientInfo> selected(
+    active_clients.begin(),
+    active_clients.begin() + participant_count
+  );
+  
+  std::cout << "Selected " << selected.size() << " participants" << std::endl;
+  return selected;
+}
+
+std::optional<Event> TribuneServer::createEvent(EventType type, const std::string& event_id) {
+  auto participants = selectParticipants();
+  
+  if (participants.empty()) {
+    return std::nullopt;
+  }
+  
+  Event event;
+  event.type_ = type;
+  event.event_id = event_id;
+  event.participants = std::move(participants);
+  
+  return event;
 }
 

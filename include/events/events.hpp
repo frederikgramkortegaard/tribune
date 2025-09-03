@@ -2,12 +2,14 @@
 #include <chrono>
 #include <nlohmann/json.hpp>
 #include <string>
+#include <vector>
 
 enum EventType { DataSubmission = 0 };
 
 struct Event {
   EventType type_;
   std::string event_id;
+  std::vector<ClientInfo> participants;
 };
 
 enum ResponseType { DataPart = 0, ConnectionRequest };
@@ -29,14 +31,21 @@ struct ConnectResponse {
   std::string ed25519_pub;
 };
 
+struct ClientInfo {
+  std::string client_id;
+  std::string client_host;
+  std::string client_port;
+};
+
 // JSON conversion functions for Event
 inline void to_json(nlohmann::json &j, const Event &e) {
-  j = nlohmann::json{{"type", e.type_}, {"event_id", e.event_id}};
+  j = nlohmann::json{{"type", e.type_}, {"event_id", e.event_id}, {"participants", e.participants}};
 }
 
 inline void from_json(const nlohmann::json &j, Event &e) {
   j.at("type").get_to(e.type_);
   j.at("event_id").get_to(e.event_id);
+  j.at("participants").get_to(e.participants);
 }
 
 // JSON conversion functions for EventResponse
@@ -79,4 +88,17 @@ inline void from_json(const nlohmann::json &j, ConnectResponse &c) {
   j.at("client_id").get_to(c.client_id);
   j.at("x25519_pub").get_to(c.x25519_pub);
   j.at("ed25519_pub").get_to(c.ed25519_pub);
+}
+
+// JSON conversion functions for ClientInfo
+inline void to_json(nlohmann::json &j, const ClientInfo &c) {
+  j = nlohmann::json{{"client_id", c.client_id},
+                     {"client_host", c.client_host},
+                     {"client_port", c.client_port}};
+}
+
+inline void from_json(const nlohmann::json &j, ClientInfo &c) {
+  j.at("client_id").get_to(c.client_id);
+  j.at("client_host").get_to(c.client_host);
+  j.at("client_port").get_to(c.client_port);
 }

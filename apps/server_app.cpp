@@ -27,12 +27,16 @@ int main() {
     while (true) {
         std::this_thread::sleep_for(std::chrono::seconds(40));
         
-        Event e;
-        e.type_ = EventType::DataSubmission;
-        e.event_id = "event-" + std::to_string(dis(gen));
+        std::string event_id = "event-" + std::to_string(dis(gen));
         
-        std::cout << "Announcing event: " << e.event_id << std::endl;
-        server.announceEvent(e);
+        if (auto event = server.createEvent(EventType::DataSubmission, event_id)) {
+            std::cout << "Created event: " << event_id << " with " 
+                      << event->participants.size() << " participants" << std::endl;
+            server.announceEvent(*event);
+        } else {
+            std::cout << "Insufficient participants for event " << event_id 
+                      << ", skipping..." << std::endl;
+        }
     }
     
     server_thread.join();  // Never reached but good practice

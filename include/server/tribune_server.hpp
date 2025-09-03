@@ -1,22 +1,39 @@
 #pragma once
 #include "client_state.hpp"
 #include "events/events.hpp"
+#include "server_config.hpp"
 #include <httplib.h>
 #include <string>
 #include <unordered_map>
+#include <random>
+#include <algorithm>
+#include <queue>
+#include <optional>
 
 class TribuneServer {
 public:
-  TribuneServer(const std::string &host, int port);
+  TribuneServer(const std::string &host, int port, const ServerConfig& config = DEFAULT_SERVER_CONFIG);
 
   void start();
-  void announceEvent(const Event);
+  void announceEvent(const Event& event);
+  
+  // Event creation with participant selection
+  std::optional<Event> createEvent(EventType type, const std::string& event_id);
 
 private:
+  // Participant selection (internal)
+  std::vector<ClientInfo> selectParticipants();
+  // Configuration
+  ServerConfig config_;
+  
   // Meta
   httplib::Server svr;
   std::string host;
   int port;
+  
+  // Random number generation
+  std::random_device rd_;
+  std::mt19937 rng_;
 
   // Transport Layer Management
   std::unordered_map<std::string, ClientState> roster;
