@@ -38,8 +38,7 @@ std::optional<ConnectResponse> parseConnectResponse(const std::string &body) {
     
     // Validate required fields
     if (!j.contains("client_host") || !j.contains("client_port") || 
-        !j.contains("client_id") || !j.contains("x25519_pub") || 
-        !j.contains("ed25519_pub")) {
+        !j.contains("client_id") || !j.contains("ed25519_pub")) {
       std::cout << "Missing required fields in connect request" << std::endl;
       return std::nullopt;
     }

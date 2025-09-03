@@ -5,6 +5,14 @@
 #include <vector>
 
 enum EventType { DataSubmission = 0 };
+enum ResponseType { DataPart = 0, ConnectionRequest };
+
+struct ClientInfo {
+  std::string client_id;
+  std::string client_host;
+  std::string client_port;
+  std::string ed25519_pub;  // Public key for signature verification
+};
 
 struct Event {
   EventType type_;
@@ -12,8 +20,6 @@ struct Event {
   std::string computation_type;
   std::vector<ClientInfo> participants;
 };
-
-enum ResponseType { DataPart = 0, ConnectionRequest };
 
 struct EventResponse {
   ResponseType type_;
@@ -29,13 +35,6 @@ struct ConnectResponse {
   std::string client_port;
   std::string client_id;
   std::string ed25519_pub;
-};
-
-struct ClientInfo {
-  std::string client_id;
-  std::string client_host;
-  std::string client_port;
-  std::string ed25519_pub;  // Public key for signature verification
 };
 
 struct PeerDataMessage {
@@ -110,18 +109,6 @@ inline void from_json(const nlohmann::json &j, ConnectResponse &c) {
   j.at("ed25519_pub").get_to(c.ed25519_pub);
 }
 
-// JSON conversion functions for ClientInfo
-inline void to_json(nlohmann::json &j, const ClientInfo &c) {
-  j = nlohmann::json{{"client_id", c.client_id},
-                     {"client_host", c.client_host},
-                     {"client_port", c.client_port}};
-}
-
-inline void from_json(const nlohmann::json &j, ClientInfo &c) {
-  j.at("client_id").get_to(c.client_id);
-  j.at("client_host").get_to(c.client_host);
-  j.at("client_port").get_to(c.client_port);
-}
 
 // JSON conversion functions for PeerDataMessage
 inline void to_json(nlohmann::json &j, const PeerDataMessage &p) {

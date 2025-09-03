@@ -12,7 +12,8 @@
 
 class TribuneClient {
 public:
-  TribuneClient(const std::string &seed_host, int seed_port, int listen_port);
+  TribuneClient(const std::string &seed_host, int seed_port, int listen_port, 
+                const std::string &private_key = "", const std::string &public_key = "");
   ~TribuneClient();
 
   // Core functionality
@@ -41,6 +42,7 @@ private:
   // Client identification
   std::string client_id_;
   std::string ed25519_private_key_;  // Private key for signing
+  std::string ed25519_public_key_;   // Public key for verification
   std::string generateUUID();
 
   // Network configuration
@@ -80,4 +82,5 @@ private:
   void setupEventRoutes();
   void computeAndSubmitResult(const std::string& event_id);
   bool hasAllShards(const std::string& event_id);
+  void processOrphanShards(const Event& event);
 };

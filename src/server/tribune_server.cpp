@@ -2,15 +2,34 @@
 #include "server/tribune_server.hpp"
 #include <format>
 #include <iostream>
+#include <thread>
+#include <vector>
 
 TribuneServer::TribuneServer(const std::string &host, int port, const ServerConfig& config)
     : config_(config), host(host), port(port), rng_(rd_()) {
   setupRoutes();
 }
+
+TribuneServer::~TribuneServer() {
+  stop();
+}
 void TribuneServer::start() {
   std::cout << "Starting aggregator server on http://" << host << ":" << port
             << std::endl;
+  
+  // Start periodic event checker thread
+  should_stop_ = false;
+  checker_thread_ = std::thread(&TribuneServer::periodicEventChecker, this);
+  
   svr.listen(host, port);
+}
+
+void TribuneServer::stop() {
+  should_stop_ = true;
+  if (checker_thread_.joinable()) {
+    checker_thread_.join();
+  }
+  svr.stop();
 }
 
 void TribuneServer::setupRoutes() {
@@ -96,6 +115,30 @@ void TribuneServer::handleEndpointSubmit(const httplib::Request &req,
     std::cout << "From Client: " << parsed_res.client_id << std::endl;
     std::cout << "Event ID: " << parsed_res.event_id << std::endl;
     std::cout << "Result: " << parsed_res.data << std::endl;
+    
+    // Show progress: received X/Y sub results
+    int received_count = 0;
+    int expected_count = 0;
+    {
+      std::lock_guard<std::mutex> responses_lock(unprocessed_responses_mutex_);
+      std::lock_guard<std::mutex> events_lock(active_events_mutex_);
+      
+      auto responses_it = unprocessed_responses.find(parsed_res.event_id);
+      if (responses_it != unprocessed_responses.end()) {
+        received_count = static_cast<int>(responses_it->second.size()) + 1; // +1 for current result
+      } else {
+        received_count = 1;
+      }
+      
+      auto active_it = active_events_.find(parsed_res.event_id);
+      if (active_it != active_events_.end()) {
+        expected_count = active_it->second.expected_participants;
+      }
+    }
+    
+    if (expected_count > 0) {
+      std::cout << "Progress: received " << received_count << "/" << expected_count << " sub results" << std::endl;
+    }
     std::cout << "====================================" << std::endl;
 
     std::cout << "Checking if client '" << parsed_res.client_id
@@ -147,20 +190,48 @@ void TribuneServer::announceEvent(const Event& event) {
 
   std::cout << "Announcing event " << event.event_id << " to " 
             << event.participants.size() << " participants" << std::endl;
-
-  for (const auto& participant : event.participants) {
-    httplib::Client cli(participant.client_host, std::stoi(participant.client_port));
-    auto res = cli.Post("/event", json_str, "application/json");
-
-    if (res && res->status == 200) {
-      std::cout << "Sent Event with ID: " << event.event_id
-                << ", to Client: " << participant.client_host << ":"
-                << participant.client_port << " - Status: " << res->status << std::endl;
-    } else {
-      std::cout << "Failed to send Event to Client: " << participant.client_host 
-                << ":" << participant.client_port << std::endl;
-    }
+  
+  // Track this event as active
+  {
+    std::lock_guard<std::mutex> lock(active_events_mutex_);
+    ActiveEvent active_event;
+    active_event.event_id = event.event_id;
+    active_event.computation_type = event.computation_type;
+    active_event.expected_participants = static_cast<int>(event.participants.size());
+    active_event.created_time = std::chrono::steady_clock::now();
+    active_events_[event.event_id] = active_event;
   }
+
+  // Send event announcements to all participants in parallel
+  std::vector<std::thread> announcement_threads;
+  
+  for (const auto& participant : event.participants) {
+    announcement_threads.emplace_back([this, participant, json_str, event_id = event.event_id]() {
+      try {
+        httplib::Client cli(participant.client_host, std::stoi(participant.client_port));
+        auto res = cli.Post("/event", json_str, "application/json");
+
+        if (res && res->status == 200) {
+          std::cout << "Sent Event with ID: " << event_id
+                    << ", to Client: " << participant.client_host << ":"
+                    << participant.client_port << " - Status: " << res->status << std::endl;
+        } else {
+          std::cout << "Failed to send Event to Client: " << participant.client_host 
+                    << ":" << participant.client_port << std::endl;
+        }
+      } catch (const std::exception& e) {
+        std::cout << "Exception sending event to " << participant.client_host 
+                  << ":" << participant.client_port << ": " << e.what() << std::endl;
+      }
+    });
+  }
+  
+  // Wait for all announcements to complete
+  for (auto& thread : announcement_threads) {
+    thread.join();
+  }
+  
+  std::cout << "All event announcements completed for event " << event.event_id << std::endl;
 }
 
 std::vector<ClientInfo> TribuneServer::selectParticipants() {
@@ -232,43 +303,110 @@ void TribuneServer::registerComputation(const std::string& type, std::unique_ptr
 }
 
 void TribuneServer::checkForCompleteResults() {
-  std::lock_guard<std::mutex> lock(unprocessed_responses_mutex_);
+  std::lock_guard<std::mutex> responses_lock(unprocessed_responses_mutex_);
+  std::lock_guard<std::mutex> events_lock(active_events_mutex_);
   
-  // Group responses by event_id
-  std::unordered_map<std::string, std::vector<std::string>> event_results;
-  std::unordered_map<std::string, std::string> event_computation_types;
+  std::vector<std::string> completed_events;
   
-  for (const auto& [event_id, client_responses] : unprocessed_responses) {
+  // Check each active event
+  for (const auto& [event_id, active_event] : active_events_) {
+    auto responses_it = unprocessed_responses.find(event_id);
+    
+    // Count received responses
+    int received_count = 0;
     std::vector<std::string> results;
-    std::string computation_type = "sum"; // TODO: Get from event metadata
     
-    for (const auto& [client_id, response] : client_responses) {
-      results.push_back(response.data);
+    if (responses_it != unprocessed_responses.end()) {
+      received_count = static_cast<int>(responses_it->second.size());
+      for (const auto& [client_id, response] : responses_it->second) {
+        results.push_back(response.data);
+      }
     }
     
-    if (!results.empty()) {
-      event_results[event_id] = std::move(results);
-      event_computation_types[event_id] = computation_type;
+    // Check if we have all expected responses
+    if (received_count >= active_event.expected_participants) {
+      std::cout << "Event " << event_id << " is complete (" << received_count 
+                << "/" << active_event.expected_participants << " responses)" << std::endl;
+      
+      // Process the complete results
+      std::lock_guard<std::mutex> comp_lock(computations_mutex_);
+      auto comp_it = computations_.find(active_event.computation_type);
+      
+      if (comp_it != computations_.end()) {
+        std::string final_result = comp_it->second->aggregateResults(results);
+        std::cout << "=== FINAL MPC RESULT ===" << std::endl;
+        std::cout << "Event: " << event_id << std::endl;
+        std::cout << "Computation: " << active_event.computation_type << std::endl;
+        std::cout << "Final Result: " << final_result << std::endl;
+        std::cout << "========================" << std::endl;
+      } else {
+        std::cout << "No computation handler for type: " << active_event.computation_type << std::endl;
+      }
+      
+      completed_events.push_back(event_id);
     }
   }
   
-  // Process complete results
-  for (const auto& [event_id, results] : event_results) {
-    const std::string& comp_type = event_computation_types[event_id];
+  // Clean up completed events
+  for (const std::string& event_id : completed_events) {
+    active_events_.erase(event_id);
+    unprocessed_responses.erase(event_id);
+  }
+}
+
+void TribuneServer::periodicEventChecker() {
+  std::cout << "Started periodic event checker thread" << std::endl;
+  
+  while (!should_stop_) {
+    // Sleep for 5 seconds between checks
+    std::this_thread::sleep_for(std::chrono::seconds(5));
     
-    std::lock_guard<std::mutex> comp_lock(computations_mutex_);
-    auto comp_it = computations_.find(comp_type);
+    if (should_stop_) break;
     
-    if (comp_it != computations_.end()) {
-      std::string final_result = comp_it->second->aggregateResults(results);
-      std::cout << "=== FINAL MPC RESULT ===" << std::endl;
-      std::cout << "Event: " << event_id << std::endl;
-      std::cout << "Computation: " << comp_type << std::endl;
-      std::cout << "Final Result: " << final_result << std::endl;
-      std::cout << "========================" << std::endl;
-    } else {
-      std::cout << "No computation handler for type: " << comp_type << std::endl;
+    // Check for timeout events (events older than 30 seconds)
+    auto now = std::chrono::steady_clock::now();
+    std::vector<std::string> timed_out_events;
+    
+    {
+      std::lock_guard<std::mutex> events_lock(active_events_mutex_);
+      std::lock_guard<std::mutex> responses_lock(unprocessed_responses_mutex_);
+      
+      for (const auto& [event_id, active_event] : active_events_) {
+        auto age = std::chrono::duration_cast<std::chrono::seconds>(now - active_event.created_time);
+        
+        if (age.count() > 30) { // 30 second timeout
+          auto responses_it = unprocessed_responses.find(event_id);
+          int received_count = responses_it != unprocessed_responses.end() 
+                               ? static_cast<int>(responses_it->second.size()) 
+                               : 0;
+          
+          std::cout << "Event " << event_id << " timed out after " << age.count() 
+                    << " seconds with " << received_count << "/" << active_event.expected_participants 
+                    << " responses" << std::endl;
+          
+          timed_out_events.push_back(event_id);
+        }
+      }
+      
+      // Clean up timed out events
+      for (const std::string& event_id : timed_out_events) {
+        active_events_.erase(event_id);
+        unprocessed_responses.erase(event_id);
+      }
+    }
+    
+    // Check for complete results
+    checkForCompleteResults();
+    
+    // Print status if there are active events
+    {
+      std::lock_guard<std::mutex> lock(active_events_mutex_);
+      if (!active_events_.empty()) {
+        std::cout << "Active events: " << active_events_.size() << std::endl;
+      }
     }
   }
+  
+  std::cout << "Periodic event checker thread stopped" << std::endl;
 }
 

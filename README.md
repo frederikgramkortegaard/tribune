@@ -30,3 +30,40 @@ The `apps/` directory has specific applications that use the library:
 Regular p2p system, but event-driven. Server publishes computation specs (could be SQL table structures or ML model definitions), clients subscribe with their endpoints, then we get this publisher-consumer MPC system where data stays distributed.
 
 Future: integrate blockchain payments for computation contributions.
+
+## Quick Start
+
+### Build and Run Demo
+
+```bash
+# Using CMake (recommended)
+mkdir build && cd build
+cmake ..
+make
+
+# Or using Makefile (simple)
+make all
+
+# Run the full MPC demonstration
+make demo
+```
+
+### Manual Testing
+
+```bash
+# Terminal 1: Start server
+./server_app
+
+# Terminal 2-N: Start clients on different ports  
+./client_app 9001 private_key_1 public_key_1
+./client_app 9002 private_key_2 public_key_2
+# ... etc
+```
+
+### Demo Script Features
+
+The `scripts/run_demo.py` script automatically:
+- Generates unique Ed25519 keypairs for each client
+- Spawns 1 server + 10 clients with colored output
+- Shows real-time MPC computation results
+- Handles graceful shutdown with Ctrl+C

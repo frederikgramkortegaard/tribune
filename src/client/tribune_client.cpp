@@ -1,18 +1,32 @@
 #include "client/data_collection_module.hpp"
 #include "client/tribune_client.hpp"
 #include "protocol/parser.hpp"
+#include <chrono>
 #include <iomanip>
 #include <iostream>
 #include <random>
 #include <sstream>
+#include <thread>
 
 TribuneClient::TribuneClient(const std::string &seed_host, int seed_port,
-                             int listen_port)
+                             int listen_port, const std::string &private_key,
+                             const std::string &public_key)
     : seed_host_(seed_host), seed_port_(seed_port), listen_port_(listen_port),
       running_(false) {
 
   client_id_ = generateUUID();
-  ed25519_private_key_ = "dummy_private_key_" + client_id_; // TODO: Generate real Ed25519 keypair
+  
+  // Use provided keys or generate dummy ones
+  if (!private_key.empty() && !public_key.empty()) {
+    ed25519_private_key_ = private_key;
+    ed25519_public_key_ = public_key;
+    std::cout << "Using provided Ed25519 keypair" << std::endl;
+  } else {
+    ed25519_private_key_ = "dummy_private_key_" + client_id_;
+    ed25519_public_key_ = "dummy_public_key_" + client_id_;
+    std::cout << "Using generated dummy keypair" << std::endl;
+  }
+  
   setupEventRoutes();
 
   // Set default mock data collection module
@@ -68,7 +82,7 @@ bool TribuneClient::connectToSeed() {
     connect_req.client_host = "localhost"; // TODO: Get actual IP
     connect_req.client_port = std::to_string(listen_port_);
     connect_req.client_id = client_id_;
-    connect_req.ed25519_pub = "dummy_ed25519_key"; // TODO: Generate real Ed25519 public key
+    connect_req.ed25519_pub = ed25519_public_key_;
 
     // Convert to JSON
     nlohmann::json j = connect_req;
@@ -173,6 +187,9 @@ void TribuneClient::onEventAnnouncement(const Event &event) {
     std::lock_guard<std::mutex> lock(active_events_mutex_);
     active_events_[event.event_id] = event;
   }
+  
+  // Process any orphan shards for this event
+  processOrphanShards(event);
 
   // Use data collection module to get client's data for this event
   std::string my_data;
@@ -188,13 +205,23 @@ void TribuneClient::onEventAnnouncement(const Event &event) {
     }
   }
 
-  // Store our own data shard
+  // Store our own data shard (extract just the value from JSON)
   {
     std::lock_guard<std::mutex> shards_lock(event_shards_mutex_);
-    event_shards_[event.event_id][client_id_] = my_data;
-    std::cout << "Stored our own shard for event " << event.event_id << std::endl;
+    try {
+      nlohmann::json data_json = nlohmann::json::parse(my_data);
+      std::string shard_value = std::to_string(data_json["value"].get<double>());
+      event_shards_[event.event_id][client_id_] = shard_value;
+      std::cout << "Stored our own shard for event " << event.event_id << " (value: " << shard_value << ")" << std::endl;
+    } catch (const std::exception& e) {
+      std::cout << "Error parsing own data JSON: " << e.what() << std::endl;
+    }
   }
 
+  // Add a small delay to ensure all participants receive the event announcement
+  // before peer data sharing begins (prevents race conditions)
+  std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  
   shareDataWithPeers(event, my_data);
 }
 
@@ -233,9 +260,15 @@ void TribuneClient::onPeerDataReceived(const PeerDataMessage &peer_msg) {
           bool all_shards_received = false;
           {
             std::lock_guard<std::mutex> shards_lock(event_shards_mutex_);
-            event_shards_[peer_msg.event_id][peer_msg.from_client] = peer_msg.data;
-            std::cout << "Stored valid and authenticated shard from " << peer_msg.from_client
-                      << std::endl;
+            try {
+              nlohmann::json data_json = nlohmann::json::parse(peer_msg.data);
+              std::string shard_value = std::to_string(data_json["value"].get<double>());
+              event_shards_[peer_msg.event_id][peer_msg.from_client] = shard_value;
+              std::cout << "Stored valid and authenticated shard from " << peer_msg.from_client
+                        << " (value: " << shard_value << ")" << std::endl;
+            } catch (const std::exception& e) {
+              std::cout << "Error parsing peer data JSON: " << e.what() << std::endl;
+            }
             
             // Check if we now have all shards
             all_shards_received = hasAllShards(peer_msg.event_id);
@@ -452,4 +485,90 @@ void TribuneClient::stop() {
 
     std::cout << "Client stopped" << std::endl;
   }
+}
+
+void TribuneClient::processOrphanShards(const Event& event) {
+  std::cout << "Processing orphan shards for event: " << event.event_id << std::endl;
+  
+  std::lock_guard<std::mutex> orphan_lock(orphan_shards_mutex_);
+  auto orphan_it = orphan_shards_.find(event.event_id);
+  
+  if (orphan_it == orphan_shards_.end()) {
+    std::cout << "No orphan shards found for event: " << event.event_id << std::endl;
+    return;
+  }
+  
+  std::cout << "Found " << orphan_it->second.size() << " orphan shards for event: " << event.event_id << std::endl;
+  
+  // Process each orphan shard
+  for (const auto& [from_client_id, orphan_data] : orphan_it->second) {
+    // Check if this client is actually an expected participant
+    bool valid_participant = false;
+    std::string sender_public_key;
+    
+    for (const auto& participant : event.participants) {
+      if (participant.client_id == from_client_id) {
+        valid_participant = true;
+        sender_public_key = participant.ed25519_pub;
+        break;
+      }
+    }
+    
+    if (valid_participant) {
+      std::cout << "Processing valid orphan shard from participant: " << from_client_id << std::endl;
+      
+      // Create a mock PeerDataMessage for validation (we don't have the original signature)
+      // For now, we'll trust orphan shards from valid participants
+      // In a production system, you'd want to store the full original message including signature
+      
+      bool all_shards_received = false;
+      {
+        std::lock_guard<std::mutex> shards_lock(event_shards_mutex_);
+        try {
+          nlohmann::json data_json = nlohmann::json::parse(orphan_data);
+          std::string shard_value = std::to_string(data_json["value"].get<double>());
+          event_shards_[event.event_id][from_client_id] = shard_value;
+          std::cout << "Integrated orphan shard from " << from_client_id 
+                    << " (value: " << shard_value << ")" << std::endl;
+        } catch (const std::exception& e) {
+          std::cout << "Error parsing orphan shard JSON: " << e.what() << std::endl;
+          continue;
+        }
+        
+        // Check if we now have all shards
+        {
+          std::lock_guard<std::mutex> active_lock(active_events_mutex_);
+          all_shards_received = hasAllShards(event.event_id);
+        }
+      }
+      
+      // If we have all shards, start computation
+      if (all_shards_received) {
+        std::cout << "All shards received for event " << event.event_id 
+                  << " (including orphans), starting computation" << std::endl;
+        std::thread([this, event_id = event.event_id]() {
+          computeAndSubmitResult(event_id);
+        }).detach();
+      }
+    } else {
+      std::cout << "Orphan shard from non-participant " << from_client_id 
+                << ", ignoring" << std::endl;
+    }
+  }
+  
+  // Clean up processed orphan shards
+  orphan_shards_.erase(orphan_it);
+  
+  // Remove from orphan order queue (note: this is inefficient, but works for demo)
+  std::queue<std::string> new_order;
+  while (!orphan_order_.empty()) {
+    std::string event_id = orphan_order_.front();
+    orphan_order_.pop();
+    if (event_id != event.event_id) {
+      new_order.push(event_id);
+    }
+  }
+  orphan_order_ = new_order;
+  
+  std::cout << "Finished processing orphan shards for event: " << event.event_id << std::endl;
 }

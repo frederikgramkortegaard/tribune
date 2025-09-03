@@ -5,11 +5,27 @@
 #include <chrono>
 #include <memory>
 
-int main() {
-    std::cout << "Starting Tribune Client..." << std::endl;
+int main(int argc, char* argv[]) {
+    // Parse command line arguments
+    std::string server_host = "localhost";
+    int server_port = 8080;
+    int listen_port = 9001;
+    std::string private_key = "dummy_private_key";
+    std::string public_key = "dummy_public_key";
     
-    // Create client that connects to server at localhost:8080 and listens on port 9001
-    TribuneClient client("localhost", 8080, 9001);
+    if (argc >= 2) listen_port = std::stoi(argv[1]);
+    if (argc >= 3) private_key = argv[2];
+    if (argc >= 4) public_key = argv[3];
+    if (argc >= 5) server_host = argv[4];
+    if (argc >= 6) server_port = std::stoi(argv[5]);
+    
+    std::cout << "Starting Tribune Client..." << std::endl;
+    std::cout << "Listen Port: " << listen_port << std::endl;
+    std::cout << "Server: " << server_host << ":" << server_port << std::endl;
+    std::cout << "Public Key: " << public_key << std::endl;
+    
+    // Create client with keys
+    TribuneClient client(server_host, server_port, listen_port, private_key, public_key);
     
     // Register the sum computation
     client.registerComputation("sum", std::make_unique<SumComputation>());

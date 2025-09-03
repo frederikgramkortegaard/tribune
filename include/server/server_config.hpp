@@ -18,4 +18,11 @@ struct ServerConfig {
 };
 
 // Default config
-static const ServerConfig DEFAULT_SERVER_CONFIG;
+static const ServerConfig DEFAULT_SERVER_CONFIG = {
+    "localhost",  // host
+    8080,         // port
+    3,            // min_participants 
+    10,           // max_participants
+    40,           // event_announce_interval_seconds
+    5             // max_events_without_response
+};

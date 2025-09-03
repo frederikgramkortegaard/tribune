@@ -11,12 +11,17 @@
 #include <queue>
 #include <optional>
 #include <memory>
+#include <thread>
+#include <atomic>
+#include <chrono>
 
 class TribuneServer {
 public:
   TribuneServer(const std::string &host, int port, const ServerConfig& config = DEFAULT_SERVER_CONFIG);
+  ~TribuneServer();
 
   void start();
+  void stop();
   void announceEvent(const Event& event);
   
   // Event creation with participant selection
@@ -63,6 +68,21 @@ private:
   std::unordered_map<std::string, std::unique_ptr<MPCComputation>> computations_;
   std::mutex computations_mutex_;
   
+  // Active event tracking
+  struct ActiveEvent {
+    std::string event_id;
+    std::string computation_type;
+    int expected_participants;
+    std::chrono::time_point<std::chrono::steady_clock> created_time;
+  };
+  std::unordered_map<std::string, ActiveEvent> active_events_;
+  std::mutex active_events_mutex_;
+  
   // Private methods
   void checkForCompleteResults();
+  void periodicEventChecker();
+  
+  // Background thread for periodic checking
+  std::thread checker_thread_;
+  std::atomic<bool> should_stop_{false};
 };
