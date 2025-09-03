@@ -1,11 +1,13 @@
 #pragma once
 #include "data_collection_module.hpp"
 #include "events/events.hpp"
+#include "mpc/mpc_computation.hpp"
 #include <atomic>
 #include <httplib.h>
 #include <memory>
 #include <string>
 #include <thread>
+#include <unordered_map>
 
 class TribuneClient {
 public:
@@ -19,6 +21,9 @@ public:
 
   // Data collection module management
   void setDataCollectionModule(std::unique_ptr<DataCollectionModule> module);
+  
+  // MPC computation management
+  void registerComputation(const std::string& type, std::unique_ptr<MPCComputation> computation);
 
   // Event handling
   void onEventAnnouncement(const Event &event);
@@ -63,6 +68,10 @@ private:
   // Data collection
   std::unique_ptr<DataCollectionModule> data_module_;
   std::mutex data_module_mutex_;
+  
+  // MPC computations
+  std::unordered_map<std::string, std::unique_ptr<MPCComputation>> computations_;
+  std::mutex computations_mutex_;
 
   // Private methods
   void runEventListener();

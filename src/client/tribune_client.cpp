@@ -32,6 +32,12 @@ void TribuneClient::setDataCollectionModule(
   std::cout << "Data collection module updated" << std::endl;
 }
 
+void TribuneClient::registerComputation(const std::string& type, std::unique_ptr<MPCComputation> computation) {
+  std::lock_guard<std::mutex> lock(computations_mutex_);
+  computations_[type] = std::move(computation);
+  std::cout << "Registered MPC computation: " << type << std::endl;
+}
+
 std::string TribuneClient::generateUUID() {
   // Simple UUID v4 generation using random numbers
   std::random_device rd;

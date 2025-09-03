@@ -204,7 +204,7 @@ std::vector<ClientInfo> TribuneServer::selectParticipants() {
   return selected;
 }
 
-std::optional<Event> TribuneServer::createEvent(EventType type, const std::string& event_id) {
+std::optional<Event> TribuneServer::createEvent(EventType type, const std::string& event_id, const std::string& computation_type) {
   auto participants = selectParticipants();
   
   if (participants.empty()) {
@@ -214,6 +214,7 @@ std::optional<Event> TribuneServer::createEvent(EventType type, const std::strin
   Event event;
   event.type_ = type;
   event.event_id = event_id;
+  event.computation_type = computation_type;
   event.participants = std::move(participants);
   
   return event;

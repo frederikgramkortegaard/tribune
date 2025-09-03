@@ -9,6 +9,7 @@ enum EventType { DataSubmission = 0 };
 struct Event {
   EventType type_;
   std::string event_id;
+  std::string computation_type;
   std::vector<ClientInfo> participants;
 };
 
@@ -46,12 +47,13 @@ struct PeerDataMessage {
 
 // JSON conversion functions for Event
 inline void to_json(nlohmann::json &j, const Event &e) {
-  j = nlohmann::json{{"type", e.type_}, {"event_id", e.event_id}, {"participants", e.participants}};
+  j = nlohmann::json{{"type", e.type_}, {"event_id", e.event_id}, {"computation_type", e.computation_type}, {"participants", e.participants}};
 }
 
 inline void from_json(const nlohmann::json &j, Event &e) {
   j.at("type").get_to(e.type_);
   j.at("event_id").get_to(e.event_id);
+  j.at("computation_type").get_to(e.computation_type);
   j.at("participants").get_to(e.participants);
 }
 

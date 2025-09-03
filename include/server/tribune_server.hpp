@@ -18,7 +18,7 @@ public:
   void announceEvent(const Event& event);
   
   // Event creation with participant selection
-  std::optional<Event> createEvent(EventType type, const std::string& event_id);
+  std::optional<Event> createEvent(EventType type, const std::string& event_id, const std::string& computation_type = "sum");
 
 private:
   // Participant selection (internal)

@@ -1,13 +1,18 @@
 #include "client/tribune_client.hpp"
+#include "mpc/mpc_computation.hpp"
 #include <iostream>
 #include <thread>
 #include <chrono>
+#include <memory>
 
 int main() {
     std::cout << "Starting Tribune Client..." << std::endl;
     
     // Create client that connects to server at localhost:8080 and listens on port 9001
     TribuneClient client("localhost", 8080, 9001);
+    
+    // Register the sum computation
+    client.registerComputation("sum", std::make_unique<SumComputation>());
     
     // Connect to the seed node (server)
     if (!client.connectToSeed()) {
