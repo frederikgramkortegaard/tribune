@@ -25,3 +25,5 @@ The `apps/` directory has specific applications that use the library:
 Regular p2p system, but event-driven. Server publishes computation specs (could be SQL table structures or ML model definitions), clients subscribe with their endpoints, then we get this publisher-consumer MPC system where data stays distributed.
 
 Future: integrate blockchain payments for computation contributions.
+
+:pushpin: [Development TODO](https://github.com/frederikgramkortegaard/tribune/blob/master/TODO.md)
