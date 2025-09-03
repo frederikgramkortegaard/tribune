@@ -17,6 +17,9 @@ public:
 
   // Event handling
   void onEventAnnouncement(const Event &event);
+  
+  // Peer coordination
+  void shareDataWithPeers(const Event &event, const std::string &my_data);
 
   // Getters
   const std::string &getClientId() const { return client_id_; }
@@ -37,14 +40,7 @@ private:
   std::atomic<bool> running_;
   httplib::Server event_server_;
 
-  // Peers Management
-  std::mutex peers_mutex_;
-  std::thread peer_sync_thread_;
-  std::vector<ClientInfo> current_peers_;
-
   // Private methods
-  // // Meta
   void runEventListener();
   void setupEventRoutes();
-  // // Data Sharding / Peer Relay'ing
 };

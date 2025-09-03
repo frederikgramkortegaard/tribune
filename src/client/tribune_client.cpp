@@ -122,10 +122,53 @@ void TribuneClient::onEventAnnouncement(const Event &event) {
   std::cout << "=== EVENT RECEIVED ===" << std::endl;
   std::cout << "Event ID: " << event.event_id << std::endl;
   std::cout << "Event Type: " << event.type_ << std::endl;
+  std::cout << "Participants: " << event.participants.size() << std::endl;
   std::cout << "======================" << std::endl;
 
   // TODO: This is where data collection modules would be called
-  // For now, just acknowledge receipt
+  // For now, just acknowledge receipt and share dummy data
+  std::string my_data = "dummy_data_from_" + client_id_;
+  shareDataWithPeers(event, my_data);
+}
+
+void TribuneClient::shareDataWithPeers(const Event &event,
+                                       const std::string &my_data) {
+  std::cout << "Sharing data with peers for event: " << event.event_id
+            << std::endl;
+
+  for (const auto &peer : event.participants) {
+    // Skip ourselves
+    if (peer.client_id == client_id_) {
+      continue;
+    }
+
+    std::cout << "Sending data to peer: " << peer.client_id << " at "
+              << peer.client_host << ":" << peer.client_port << std::endl;
+
+    try {
+      httplib::Client cli(peer.client_host, std::stoi(peer.client_port));
+
+      // Create data sharing payload
+      nlohmann::json payload;
+      payload["event_id"] = event.event_id;
+      payload["from_client"] = client_id_;
+      payload["data"] = my_data;
+
+      auto res = cli.Post("/peer-data", payload.dump(), "application/json");
+
+      if (res && res->status == 200) {
+        std::cout << "Successfully shared data with " << peer.client_id
+                  << std::endl;
+      } else {
+        std::cout << "Failed to share data with " << peer.client_id
+                  << std::endl;
+      }
+
+    } catch (const std::exception &e) {
+      std::cout << "Exception sharing data with " << peer.client_id << ": "
+                << e.what() << std::endl;
+    }
+  }
 }
 
 void TribuneClient::stop() {
