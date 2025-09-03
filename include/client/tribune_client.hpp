@@ -56,7 +56,9 @@ private:
   
   // Orphan shards for events we haven't received yet
   std::unordered_map<std::string, std::unordered_map<std::string, std::string>> orphan_shards_;
+  std::queue<std::string> orphan_order_; // Track insertion order for FIFO cleanup
   std::mutex orphan_shards_mutex_;
+  static constexpr size_t MAX_ORPHAN_EVENTS = 100;
 
   // Data collection
   std::unique_ptr<DataCollectionModule> data_module_;

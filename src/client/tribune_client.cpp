@@ -189,37 +189,55 @@ void TribuneClient::onPeerDataReceived(const PeerDataMessage &peer_msg) {
   {
     std::lock_guard<std::mutex> active_lock(active_events_mutex_);
     auto it = active_events_.find(peer_msg.event_id);
-    
+
     // We're already aware of this event, validate and add this shard
     if (it != active_events_.end()) {
       // Check if this client is actually an expected participant of the event
       bool valid_participant = false;
-      
+
+      //@TODO : At some point we're going to want to use e. ppke
       for (const auto &participant : it->second.participants) {
         if (participant.client_id == peer_msg.from_client) {
           valid_participant = true;
           break;
         }
       }
-      
+
       if (valid_participant) {
         std::lock_guard<std::mutex> shards_lock(event_shards_mutex_);
         event_shards_[peer_msg.event_id][peer_msg.from_client] = peer_msg.data;
-        std::cout << "Stored valid shard from " << peer_msg.from_client << std::endl;
+        std::cout << "Stored valid shard from " << peer_msg.from_client
+                  << std::endl;
       } else {
-        std::cout << "Rejected shard from unauthorized client: " << peer_msg.from_client << std::endl;
+        std::cout << "Rejected shard from unauthorized client: "
+                  << peer_msg.from_client << std::endl;
       }
-      
-    // We don't know this event yet, put it in orphan shards for later validation
+
+      // We don't know this event yet, put it in orphan shards for later
+      // validation
     } else {
       std::lock_guard<std::mutex> orphan_lock(orphan_shards_mutex_);
+      
+      // If we're at capacity, remove the oldest orphan event
+      while (orphan_shards_.size() >= MAX_ORPHAN_EVENTS && !orphan_order_.empty()) {
+        std::string oldest_event = orphan_order_.front();
+        orphan_order_.pop();
+        orphan_shards_.erase(oldest_event);
+        std::cout << "Evicted oldest orphan event: " << oldest_event << std::endl;
+      }
+      
+      // Add new orphan (or add to existing orphan event)
+      if (orphan_shards_.find(peer_msg.event_id) == orphan_shards_.end()) {
+        orphan_order_.push(peer_msg.event_id);
+      }
       orphan_shards_[peer_msg.event_id][peer_msg.from_client] = peer_msg.data;
-      std::cout << "Stored orphan shard from " << peer_msg.from_client << " for unknown event" << std::endl;
+      std::cout << "Stored orphan shard from " << peer_msg.from_client
+                << " for unknown event" << std::endl;
     }
   }
-  
+
   // TODO: Check if we have data from all expected peers
-  // TODO: Perform computation when ready  
+  // TODO: Perform computation when ready
   // TODO: Send EventResponse back to server
 }
 
