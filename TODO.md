@@ -11,6 +11,7 @@
 - [ ] Secret sharing implementation  
 - [ ] Actual MPC computation logic instead of dummy data
 - [ ] Real key generation (not dummy keys)
+- [ ] PGP-style cryptographic signatures for peer data validation
 
 ## Data Formats
 - [ ] Better structured data instead of raw strings

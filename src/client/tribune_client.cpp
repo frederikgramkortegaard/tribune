@@ -1,5 +1,5 @@
-#include "client/tribune_client.hpp"
 #include "client/data_collection_module.hpp"
+#include "client/tribune_client.hpp"
 #include "protocol/parser.hpp"
 #include <iomanip>
 #include <iostream>
@@ -13,7 +13,7 @@ TribuneClient::TribuneClient(const std::string &seed_host, int seed_port,
 
   client_id_ = generateUUID();
   setupEventRoutes();
-  
+
   // Set default mock data collection module
   data_module_ = std::make_unique<MockDataCollectionModule>(client_id_);
 
@@ -25,7 +25,8 @@ TribuneClient::TribuneClient(const std::string &seed_host, int seed_port,
 
 TribuneClient::~TribuneClient() { stop(); }
 
-void TribuneClient::setDataCollectionModule(std::unique_ptr<DataCollectionModule> module) {
+void TribuneClient::setDataCollectionModule(
+    std::unique_ptr<DataCollectionModule> module) {
   std::lock_guard<std::mutex> lock(data_module_mutex_);
   data_module_ = std::move(module);
   std::cout << "Data collection module updated" << std::endl;
@@ -126,7 +127,7 @@ void TribuneClient::setupEventRoutes() {
       nlohmann::json j = nlohmann::json::parse(req.body);
       PeerDataMessage peer_msg = j.get<PeerDataMessage>();
 
-      // Handle the peer data
+      // Handle the peer data with validation
       onPeerDataReceived(peer_msg);
 
       // Send response
@@ -169,10 +170,11 @@ void TribuneClient::onEventAnnouncement(const Event &event) {
       std::cout << "Collected data: " << my_data << std::endl;
     } else {
       my_data = "no_data_module_configured";
-      std::cout << "Warning: No data collection module configured!" << std::endl;
+      std::cout << "Warning: No data collection module configured!"
+                << std::endl;
     }
   }
-  
+
   shareDataWithPeers(event, my_data);
 }
 
@@ -183,11 +185,42 @@ void TribuneClient::onPeerDataReceived(const PeerDataMessage &peer_msg) {
   std::cout << "Data: " << peer_msg.data << std::endl;
   std::cout << "===========================" << std::endl;
 
-  // TODO: Process the received peer data
-  // - Store it for aggregation
-  // - Check if we have data from all expected peers
-  // - Perform computation when ready
-  // - Eventually send EventResponse back to server
+  // Save the received shard
+  {
+    std::lock_guard<std::mutex> active_lock(active_events_mutex_);
+    auto it = active_events_.find(peer_msg.event_id);
+    
+    // We're already aware of this event, validate and add this shard
+    if (it != active_events_.end()) {
+      // Check if this client is actually an expected participant of the event
+      bool valid_participant = false;
+      
+      for (const auto &participant : it->second.participants) {
+        if (participant.client_id == peer_msg.from_client) {
+          valid_participant = true;
+          break;
+        }
+      }
+      
+      if (valid_participant) {
+        std::lock_guard<std::mutex> shards_lock(event_shards_mutex_);
+        event_shards_[peer_msg.event_id][peer_msg.from_client] = peer_msg.data;
+        std::cout << "Stored valid shard from " << peer_msg.from_client << std::endl;
+      } else {
+        std::cout << "Rejected shard from unauthorized client: " << peer_msg.from_client << std::endl;
+      }
+      
+    // We don't know this event yet, put it in orphan shards for later validation
+    } else {
+      std::lock_guard<std::mutex> orphan_lock(orphan_shards_mutex_);
+      orphan_shards_[peer_msg.event_id][peer_msg.from_client] = peer_msg.data;
+      std::cout << "Stored orphan shard from " << peer_msg.from_client << " for unknown event" << std::endl;
+    }
+  }
+  
+  // TODO: Check if we have data from all expected peers
+  // TODO: Perform computation when ready  
+  // TODO: Send EventResponse back to server
 }
 
 void TribuneClient::shareDataWithPeers(const Event &event,
@@ -210,10 +243,13 @@ void TribuneClient::shareDataWithPeers(const Event &event,
       httplib::Client cli(peer.client_host, std::stoi(peer.client_port));
 
       // Create data sharing payload
-      nlohmann::json payload;
-      payload["event_id"] = event.event_id;
-      payload["from_client"] = client_id_;
-      payload["data"] = my_data;
+      PeerDataMessage peer_msg;
+      peer_msg.event_id = event.event_id;
+      peer_msg.from_client = client_id_;
+      peer_msg.data = my_data;
+      peer_msg.timestamp = std::chrono::system_clock::now();
+
+      nlohmann::json payload = peer_msg;
 
       auto res = cli.Post("/peer-data", payload.dump(), "application/json");
 

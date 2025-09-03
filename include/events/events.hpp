@@ -41,6 +41,7 @@ struct PeerDataMessage {
   std::string event_id;
   std::string from_client;
   std::string data;
+  std::chrono::time_point<std::chrono::system_clock> timestamp;
 };
 
 // JSON conversion functions for Event
