@@ -34,9 +34,11 @@ private:
   // Random number generation
   std::random_device rd_;
   std::mt19937 rng_;
+  std::mutex rng_mutex_;
 
   // Transport Layer Management
   std::unordered_map<std::string, ClientState> roster;
+  std::mutex roster_mutex_;
 
   // Private Methods
   void setupRoutes();
@@ -48,6 +50,7 @@ private:
   std::unordered_map<std::string,
                      std::unordered_map<std::string, EventResponse>>
       unprocessed_responses;
+  std::mutex unprocessed_responses_mutex_;
   std::queue<Event> pending_events;
   std::mutex event_mutex;
 };

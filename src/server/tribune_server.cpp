@@ -42,13 +42,16 @@ void TribuneServer::handleEndpointPeers(const httplib::Request &req,
 
   std::string output = "{\"peers\":[";
   bool first = true;
-  for (auto const &[key, val] : this->roster) {
-    if (val.isClientParticipating()) {
-      if (!first) {
-        output += ",";
+  {
+    std::lock_guard<std::mutex> lock(roster_mutex_);
+    for (auto const &[key, val] : this->roster) {
+      if (val.isClientParticipating()) {
+        if (!first) {
+          output += ",";
+        }
+        output += std::format("\"{}:{}\"", val.client_host, val.client_port);
+        first = false;
       }
-      output += std::format("\"{}:{}\"", val.client_host, val.client_port);
-      first = false;
     }
   }
   output += "]}";
@@ -70,9 +73,13 @@ void TribuneServer::handleEndpointConnect(const httplib::Request &req,
 
     std::cout << "Adding client to roster with ID: '" << parsed_res.client_id
               << "'" << std::endl;
-    this->roster[parsed_res.client_id] = state;
-    std::cout << "Roster size after adding: " << this->roster.size()
-              << std::endl;
+    
+    {
+      std::lock_guard<std::mutex> lock(roster_mutex_);
+      this->roster[parsed_res.client_id] = state;
+      std::cout << "Roster size after adding: " << this->roster.size()
+                << std::endl;
+    }
 
     res.status = 200;
     res.set_content("{\"received\":true}", "application/json");
@@ -92,27 +99,34 @@ void TribuneServer::handleEndpointSubmit(const httplib::Request &req,
 
     std::cout << "Checking if client '" << parsed_res.client_id
               << "' is in roster..." << std::endl;
-    std::cout << "Current roster contents:" << std::endl;
-    for (const auto &[id, _] : this->roster) {
-      std::cout << "  - '" << id << "'" << std::endl;
-    }
+    
+    {
+      std::lock_guard<std::mutex> roster_lock(roster_mutex_);
+      std::cout << "Current roster contents:" << std::endl;
+      for (const auto &[id, _] : this->roster) {
+        std::cout << "  - '" << id << "'" << std::endl;
+      }
 
-    if (this->roster.find(parsed_res.client_id) != this->roster.end()) {
-      this->unprocessed_responses[parsed_res.event_id][parsed_res.client_id] =
-          parsed_res;
+      if (this->roster.find(parsed_res.client_id) != this->roster.end()) {
+        {
+          std::lock_guard<std::mutex> responses_lock(unprocessed_responses_mutex_);
+          this->unprocessed_responses[parsed_res.event_id][parsed_res.client_id] =
+              parsed_res;
+        }
 
-      this->roster[parsed_res.client_id].markReceivedEvent();
+        this->roster[parsed_res.client_id].markReceivedEvent();
 
-      res.status = 200;
-      res.set_content("{\"received\":true}", "application/json");
-    } else {
-      std::cout
-          << "Received valid SubmitResponse from Unconnected Client with ID: "
-          << parsed_res.client_id << ", for Event: " << parsed_res.event_id
-          << std::endl;
-      res.status = 400;
-      res.set_content("{\"error\":\"Client not connected\"}",
-                      "application/json");
+        res.status = 200;
+        res.set_content("{\"received\":true}", "application/json");
+      } else {
+        std::cout
+            << "Received valid SubmitResponse from Unconnected Client with ID: "
+            << parsed_res.client_id << ", for Event: " << parsed_res.event_id
+            << std::endl;
+        res.status = 400;
+        res.set_content("{\"error\":\"Client not connected\"}",
+                        "application/json");
+      }
     }
 
   } else {
@@ -149,6 +163,7 @@ std::vector<ClientInfo> TribuneServer::selectParticipants() {
   // Get all active participating clients
   std::vector<ClientInfo> active_clients;
   
+  std::lock_guard<std::mutex> lock(roster_mutex_);
   for (const auto& [client_id, client_state] : roster) {
     if (client_state.isClientParticipating()) {
       ClientInfo info;
@@ -175,7 +190,10 @@ std::vector<ClientInfo> TribuneServer::selectParticipants() {
   );
   
   // Random selection
-  std::shuffle(active_clients.begin(), active_clients.end(), rng_);
+  {
+    std::lock_guard<std::mutex> rng_lock(rng_mutex_);
+    std::shuffle(active_clients.begin(), active_clients.end(), rng_);
+  }
   
   std::vector<ClientInfo> selected(
     active_clients.begin(),
