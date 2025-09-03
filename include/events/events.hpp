@@ -1,5 +1,6 @@
 #pragma once
 #include <chrono>
+#include <iostream>
 #include <nlohmann/json.hpp>
 #include <string>
 #include <vector>
@@ -19,6 +20,10 @@ struct Event {
   std::string event_id;
   std::string computation_type;
   std::vector<ClientInfo> participants;
+  std::string server_signature;  // Server signature for verification
+  std::chrono::time_point<std::chrono::system_clock> timestamp;  // Event creation time
+  
+  Event() : timestamp(std::chrono::system_clock::now()) {}
 };
 
 struct EventResponse {
@@ -43,6 +48,7 @@ struct PeerDataMessage {
   std::string data;
   std::string signature;  // Ed25519 signature of (event_id + from_client + data)
   std::chrono::time_point<std::chrono::system_clock> timestamp;
+  Event original_event;  // Include server-signed event for propagation
 };
 
 // JSON conversion functions for ClientInfo
@@ -59,7 +65,15 @@ inline void from_json(const nlohmann::json &j, ClientInfo &c) {
 
 // JSON conversion functions for Event
 inline void to_json(nlohmann::json &j, const Event &e) {
-  j = nlohmann::json{{"type", e.type_}, {"event_id", e.event_id}, {"computation_type", e.computation_type}, {"participants", e.participants}};
+  j = nlohmann::json{
+    {"type", e.type_}, 
+    {"event_id", e.event_id}, 
+    {"computation_type", e.computation_type}, 
+    {"participants", e.participants},
+    {"server_signature", e.server_signature},
+    {"timestamp", std::chrono::duration_cast<std::chrono::milliseconds>(
+                      e.timestamp.time_since_epoch()).count()}
+  };
 }
 
 inline void from_json(const nlohmann::json &j, Event &e) {
@@ -67,6 +81,16 @@ inline void from_json(const nlohmann::json &j, Event &e) {
   j.at("event_id").get_to(e.event_id);
   j.at("computation_type").get_to(e.computation_type);
   j.at("participants").get_to(e.participants);
+  
+  if (j.contains("server_signature")) {
+    j.at("server_signature").get_to(e.server_signature);
+  }
+  
+  if (j.contains("timestamp")) {
+    int64_t timestamp_ms = j.at("timestamp");
+    e.timestamp = std::chrono::system_clock::time_point(
+        std::chrono::milliseconds(timestamp_ms));
+  }
 }
 
 // JSON conversion functions for EventResponse
@@ -112,10 +136,15 @@ inline void from_json(const nlohmann::json &j, ConnectResponse &c) {
 
 // JSON conversion functions for PeerDataMessage
 inline void to_json(nlohmann::json &j, const PeerDataMessage &p) {
-  j = nlohmann::json{{"event_id", p.event_id},
-                     {"from_client", p.from_client},
-                     {"data", p.data},
-                     {"signature", p.signature}};
+  j = nlohmann::json{
+    {"event_id", p.event_id},
+    {"from_client", p.from_client},
+    {"data", p.data},
+    {"signature", p.signature},
+    {"timestamp", std::chrono::duration_cast<std::chrono::milliseconds>(
+                      p.timestamp.time_since_epoch()).count()},
+    {"original_event", p.original_event}
+  };
 }
 
 inline void from_json(const nlohmann::json &j, PeerDataMessage &p) {
@@ -123,4 +152,14 @@ inline void from_json(const nlohmann::json &j, PeerDataMessage &p) {
   j.at("from_client").get_to(p.from_client);
   j.at("data").get_to(p.data);
   j.at("signature").get_to(p.signature);
+  
+  if (j.contains("timestamp")) {
+    int64_t timestamp_ms = j.at("timestamp");
+    p.timestamp = std::chrono::system_clock::time_point(
+        std::chrono::milliseconds(timestamp_ms));
+  }
+  
+  if (j.contains("original_event")) {
+    j.at("original_event").get_to(p.original_event);
+  }
 }

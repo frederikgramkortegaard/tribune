@@ -4,8 +4,10 @@
 #include "mpc/mpc_computation.hpp"
 #include "crypto/signature.hpp"
 #include <atomic>
+#include <chrono>
 #include <httplib.h>
 #include <memory>
+#include <queue>
 #include <string>
 #include <thread>
 #include <unordered_map>
@@ -28,7 +30,7 @@ public:
   void registerComputation(const std::string& type, std::unique_ptr<MPCComputation> computation);
 
   // Event handling
-  void onEventAnnouncement(const Event &event);
+  void onEventAnnouncement(const Event &event, bool relay = true);
   void onPeerDataReceived(const PeerDataMessage &peer_msg);
 
   // Peer coordination
@@ -43,6 +45,7 @@ private:
   std::string client_id_;
   std::string ed25519_private_key_;  // Private key for signing
   std::string ed25519_public_key_;   // Public key for verification
+  std::string server_public_key_;    // Server's public key for signature verification
   std::string generateUUID();
 
   // Network configuration
@@ -63,11 +66,7 @@ private:
   std::unordered_map<std::string, std::unordered_map<std::string, std::string>> event_shards_;
   std::mutex event_shards_mutex_;
   
-  // Orphan shards for events we haven't received yet
-  std::unordered_map<std::string, std::unordered_map<std::string, std::string>> orphan_shards_;
-  std::queue<std::string> orphan_order_; // Track insertion order for FIFO cleanup
-  std::mutex orphan_shards_mutex_;
-  static constexpr size_t MAX_ORPHAN_EVENTS = 100;
+  // Note: Orphan shards are no longer needed with peer event propagation
 
   // Data collection
   std::unique_ptr<DataCollectionModule> data_module_;
@@ -77,10 +76,21 @@ private:
   std::unordered_map<std::string, std::unique_ptr<MPCComputation>> computations_;
   std::mutex computations_mutex_;
 
+  // TTL-based deduplication for broadcast storm prevention
+  struct RecentItem {
+    std::chrono::steady_clock::time_point received_time;
+  };
+  std::unordered_map<std::string, RecentItem> recent_events_;
+  std::unordered_map<std::string, RecentItem> recent_shards_;  // event_id + "|" + client_id
+  std::mutex recent_items_mutex_;
+  static constexpr int RECENT_ITEMS_TTL_SECONDS = 60;  // 2x event timeout
+  static constexpr int EVENT_TIMEOUT_SECONDS = 30;  // Match server timeout
+
   // Private methods
   void runEventListener();
   void setupEventRoutes();
   void computeAndSubmitResult(const std::string& event_id);
   bool hasAllShards(const std::string& event_id);
-  void processOrphanShards(const Event& event);
+  void cleanupRecentItems();
+  bool verifyEventFromServer(const Event& event);
 };

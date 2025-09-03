@@ -29,12 +29,19 @@ public:
   
   // MPC computation management
   void registerComputation(const std::string& type, std::unique_ptr<MPCComputation> computation);
+  
+  // Server identity
+  const std::string& getServerPublicKey() const { return server_public_key_; }
 
 private:
   // Participant selection (internal)
   std::vector<ClientInfo> selectParticipants();
   // Configuration
   ServerConfig config_;
+  
+  // Server cryptographic identity
+  std::string server_private_key_;
+  std::string server_public_key_;
   
   // Meta
   httplib::Server svr;

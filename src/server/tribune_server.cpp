@@ -1,12 +1,15 @@
 #include "protocol/parser.hpp"
 #include "server/tribune_server.hpp"
+#include "crypto/signature.hpp"
 #include <format>
 #include <iostream>
 #include <thread>
 #include <vector>
 
 TribuneServer::TribuneServer(const std::string &host, int port, const ServerConfig& config)
-    : config_(config), host(host), port(port), rng_(rd_()) {
+    : config_(config), host(host), port(port), rng_(rd_()),
+      server_private_key_("server_private_key_placeholder"),
+      server_public_key_("server_public_key_placeholder") {
   setupRoutes();
 }
 
@@ -100,7 +103,11 @@ void TribuneServer::handleEndpointConnect(const httplib::Request &req,
     }
 
     res.status = 200;
-    res.set_content("{\"received\":true}", "application/json");
+    nlohmann::json response = {
+      {"received", true},
+      {"server_public_key", server_public_key_}
+    };
+    res.set_content(response.dump(), "application/json");
   } else {
     res.status = 400;
     res.set_content("{\"error\":\"Invalid request\"}", "application/json");
@@ -184,12 +191,24 @@ void TribuneServer::handleEndpointSubmit(const httplib::Request &req,
 }
 
 void TribuneServer::announceEvent(const Event& event) {
+  // VALIDATE event before announcing to catch signature/timestamp issues
+  if (event.server_signature.empty()) {
+    std::cout << "ERROR: Event " << event.event_id << " has empty server signature!" << std::endl;
+  }
+  if (event.timestamp.time_since_epoch().count() == 0) {
+    std::cout << "ERROR: Event " << event.event_id << " has zero timestamp!" << std::endl;
+  }
+  
   // Convert Event to JSON string using automatic conversion
   nlohmann::json j = event;
   std::string json_str = j.dump();
 
   std::cout << "Announcing event " << event.event_id << " to " 
             << event.participants.size() << " participants" << std::endl;
+  std::cout << "Event signature: " << event.server_signature << std::endl;
+  std::cout << "JSON being sent: " << json_str.substr(0, 200) << "..." << std::endl;
+  std::cout << "Event timestamp: " << std::chrono::duration_cast<std::chrono::milliseconds>(
+                event.timestamp.time_since_epoch()).count() << "ms" << std::endl;
   
   // Track this event as active
   {
@@ -202,13 +221,17 @@ void TribuneServer::announceEvent(const Event& event) {
     active_events_[event.event_id] = active_event;
   }
 
-  // Send event announcements to all participants in parallel
+  // Send event announcements with timeouts and controlled concurrency
   std::vector<std::thread> announcement_threads;
   
   for (const auto& participant : event.participants) {
     announcement_threads.emplace_back([this, participant, json_str, event_id = event.event_id]() {
       try {
         httplib::Client cli(participant.client_host, std::stoi(participant.client_port));
+        cli.set_connection_timeout(2, 0);  // 2 second connection timeout
+        cli.set_read_timeout(5, 0);        // 5 second read timeout
+        cli.set_write_timeout(5, 0);       // 5 second write timeout
+        
         auto res = cli.Post("/event", json_str, "application/json");
 
         if (res && res->status == 200) {
@@ -217,13 +240,20 @@ void TribuneServer::announceEvent(const Event& event) {
                     << participant.client_port << " - Status: " << res->status << std::endl;
         } else {
           std::cout << "Failed to send Event to Client: " << participant.client_host 
-                    << ":" << participant.client_port << std::endl;
+                    << ":" << participant.client_port;
+          if (res) {
+            std::cout << " (Status: " << res->status << ")";
+          }
+          std::cout << std::endl;
         }
       } catch (const std::exception& e) {
         std::cout << "Exception sending event to " << participant.client_host 
                   << ":" << participant.client_port << ": " << e.what() << std::endl;
       }
     });
+    
+    // Small delay between thread creation to avoid overwhelming the system
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }
   
   // Wait for all announcements to complete
@@ -292,6 +322,13 @@ std::optional<Event> TribuneServer::createEvent(EventType type, const std::strin
   event.event_id = event_id;
   event.computation_type = computation_type;
   event.participants = std::move(participants);
+  event.timestamp = std::chrono::system_clock::now();
+  
+  // Create server signature for event verification  
+  std::string event_hash = event.event_id + "|" + event.computation_type + "|" + std::to_string(event.participants.size());
+  std::cout << "SERVER: Creating signature for event hash: " << event_hash << std::endl;
+  event.server_signature = SignatureUtils::createSignature(event_hash, server_private_key_);
+  std::cout << "SERVER: Generated signature: " << event.server_signature << std::endl;
   
   return event;
 }
