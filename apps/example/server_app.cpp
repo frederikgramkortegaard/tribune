@@ -1,14 +1,19 @@
 #include "server/tribune_server.hpp"
 #include "events/events.hpp"
+#include "mpc/mpc_computation.hpp"
 #include <iostream>
 #include <thread>
 #include <chrono>
 #include <random>
+#include <memory>
 
 int main() {
     std::cout << "Starting Tribune Server..." << std::endl;
     
     TribuneServer server("localhost", 8080);
+    
+    // Register the sum computation
+    server.registerComputation("sum", std::make_unique<SumComputation>());
     
     // Run server in background thread
     std::thread server_thread([&server]() {

@@ -116,6 +116,9 @@ void TribuneServer::handleEndpointSubmit(const httplib::Request &req,
         }
 
         this->roster[parsed_res.client_id].markReceivedEvent();
+        
+        // Check if we can aggregate results for any completed events
+        checkForCompleteResults();
 
         res.status = 200;
         res.set_content("{\"received\":true}", "application/json");
@@ -220,5 +223,52 @@ std::optional<Event> TribuneServer::createEvent(EventType type, const std::strin
   event.participants = std::move(participants);
   
   return event;
+}
+
+void TribuneServer::registerComputation(const std::string& type, std::unique_ptr<MPCComputation> computation) {
+  std::lock_guard<std::mutex> lock(computations_mutex_);
+  computations_[type] = std::move(computation);
+  std::cout << "Server registered MPC computation: " << type << std::endl;
+}
+
+void TribuneServer::checkForCompleteResults() {
+  std::lock_guard<std::mutex> lock(unprocessed_responses_mutex_);
+  
+  // Group responses by event_id
+  std::unordered_map<std::string, std::vector<std::string>> event_results;
+  std::unordered_map<std::string, std::string> event_computation_types;
+  
+  for (const auto& [event_id, client_responses] : unprocessed_responses) {
+    std::vector<std::string> results;
+    std::string computation_type = "sum"; // TODO: Get from event metadata
+    
+    for (const auto& [client_id, response] : client_responses) {
+      results.push_back(response.data);
+    }
+    
+    if (!results.empty()) {
+      event_results[event_id] = std::move(results);
+      event_computation_types[event_id] = computation_type;
+    }
+  }
+  
+  // Process complete results
+  for (const auto& [event_id, results] : event_results) {
+    const std::string& comp_type = event_computation_types[event_id];
+    
+    std::lock_guard<std::mutex> comp_lock(computations_mutex_);
+    auto comp_it = computations_.find(comp_type);
+    
+    if (comp_it != computations_.end()) {
+      std::string final_result = comp_it->second->aggregateResults(results);
+      std::cout << "=== FINAL MPC RESULT ===" << std::endl;
+      std::cout << "Event: " << event_id << std::endl;
+      std::cout << "Computation: " << comp_type << std::endl;
+      std::cout << "Final Result: " << final_result << std::endl;
+      std::cout << "========================" << std::endl;
+    } else {
+      std::cout << "No computation handler for type: " << comp_type << std::endl;
+    }
+  }
 }
 

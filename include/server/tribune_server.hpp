@@ -2,6 +2,7 @@
 #include "client_state.hpp"
 #include "events/events.hpp"
 #include "server_config.hpp"
+#include "mpc/mpc_computation.hpp"
 #include <httplib.h>
 #include <string>
 #include <unordered_map>
@@ -9,6 +10,7 @@
 #include <algorithm>
 #include <queue>
 #include <optional>
+#include <memory>
 
 class TribuneServer {
 public:
@@ -19,6 +21,9 @@ public:
   
   // Event creation with participant selection
   std::optional<Event> createEvent(EventType type, const std::string& event_id, const std::string& computation_type = "sum");
+  
+  // MPC computation management
+  void registerComputation(const std::string& type, std::unique_ptr<MPCComputation> computation);
 
 private:
   // Participant selection (internal)
@@ -53,4 +58,11 @@ private:
   std::mutex unprocessed_responses_mutex_;
   std::queue<Event> pending_events;
   std::mutex event_mutex;
+  
+  // MPC computations
+  std::unordered_map<std::string, std::unique_ptr<MPCComputation>> computations_;
+  std::mutex computations_mutex_;
+  
+  // Private methods
+  void checkForCompleteResults();
 };
