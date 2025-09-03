@@ -5,11 +5,9 @@ Tribune is a C++ library for distributed multi-party computation with P2P networ
 
 The system allows multiple parties to collaboratively train ML models, perform secure aggregations, and run distributed computations where no single party ever sees the complete dataset. Applications include federated learning scenarios, collaborative analytics, and any use case requiring computation over distributed private data.
 
-**Security Model:** This uses a star topology with centralized coordination, which has obvious trust and single-point-of-failure issues. We assume an honest-but-curious adversary model - the server coordinates but doesn't see raw client data. Not suitable for truly adversarial environments where you can't trust the coordinator.
+:speech_balloon: **Security Model:** This uses a star topology with centralized coordination, which has obvious trust and single-point-of-failure issues. We assume an honest-but-curious adversary model - the server coordinates but doesn't see raw client data. Not suitable for truly adversarial environments where you can't trust the coordinator.
 
 :pushpin: [Development TODO](https://github.com/frederikgramkortegaard/tribune/blob/master/TODO.md)
-
-:speech_balloon: See the TODO for current implementation status and planned features.
 
 ## Architecture
 
