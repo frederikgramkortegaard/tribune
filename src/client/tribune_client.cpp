@@ -26,6 +26,7 @@ TribuneClient::TribuneClient(const std::string &seed_host, int seed_port,
 TribuneClient::~TribuneClient() { stop(); }
 
 void TribuneClient::setDataCollectionModule(std::unique_ptr<DataCollectionModule> module) {
+  std::lock_guard<std::mutex> lock(data_module_mutex_);
   data_module_ = std::move(module);
   std::cout << "Data collection module updated" << std::endl;
 }
@@ -161,12 +162,15 @@ void TribuneClient::onEventAnnouncement(const Event &event) {
 
   // Use data collection module to get client's data for this event
   std::string my_data;
-  if (data_module_) {
-    my_data = data_module_->collectData(event);
-    std::cout << "Collected data: " << my_data << std::endl;
-  } else {
-    my_data = "no_data_module_configured";
-    std::cout << "Warning: No data collection module configured!" << std::endl;
+  {
+    std::lock_guard<std::mutex> lock(data_module_mutex_);
+    if (data_module_) {
+      my_data = data_module_->collectData(event);
+      std::cout << "Collected data: " << my_data << std::endl;
+    } else {
+      my_data = "no_data_module_configured";
+      std::cout << "Warning: No data collection module configured!" << std::endl;
+    }
   }
   
   shareDataWithPeers(event, my_data);

@@ -48,6 +48,7 @@ private:
   
   // Data collection
   std::unique_ptr<DataCollectionModule> data_module_;
+  std::mutex data_module_mutex_;
 
   // Private methods
   void runEventListener();
