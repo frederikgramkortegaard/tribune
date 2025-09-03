@@ -2,6 +2,7 @@
 #include "data_collection_module.hpp"
 #include "events/events.hpp"
 #include "mpc/mpc_computation.hpp"
+#include "crypto/signature.hpp"
 #include <atomic>
 #include <httplib.h>
 #include <memory>
@@ -39,6 +40,7 @@ public:
 private:
   // Client identification
   std::string client_id_;
+  std::string ed25519_private_key_;  // Private key for signing
   std::string generateUUID();
 
   // Network configuration
@@ -76,4 +78,6 @@ private:
   // Private methods
   void runEventListener();
   void setupEventRoutes();
+  void computeAndSubmitResult(const std::string& event_id);
+  bool hasAllShards(const std::string& event_id);
 };

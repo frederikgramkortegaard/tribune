@@ -28,5 +28,5 @@ include_directories(include)
 add_executable(server_app apps/example/server_app.cpp src/server/tribune_server.cpp src/server/client_state.cpp src/protocol/parser.cpp)
 target_link_libraries(server_app PRIVATE httplib::httplib nlohmann_json::nlohmann_json)
 
-add_executable(client_app apps/example/client_app.cpp src/client/tribune_client.cpp src/client/data_collection_module.cpp src/protocol/parser.cpp src/mpc/sum_computation.cpp)
+add_executable(client_app apps/example/client_app.cpp src/client/tribune_client.cpp src/client/data_collection_module.cpp src/protocol/parser.cpp src/mpc/sum_computation.cpp src/crypto/signature.cpp)
 target_link_libraries(client_app PRIVATE httplib::httplib nlohmann_json::nlohmann_json)

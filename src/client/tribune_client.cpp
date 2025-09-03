@@ -12,6 +12,7 @@ TribuneClient::TribuneClient(const std::string &seed_host, int seed_port,
       running_(false) {
 
   client_id_ = generateUUID();
+  ed25519_private_key_ = "dummy_private_key_" + client_id_; // TODO: Generate real Ed25519 keypair
   setupEventRoutes();
 
   // Set default mock data collection module
@@ -67,8 +68,7 @@ bool TribuneClient::connectToSeed() {
     connect_req.client_host = "localhost"; // TODO: Get actual IP
     connect_req.client_port = std::to_string(listen_port_);
     connect_req.client_id = client_id_;
-    connect_req.x25519_pub = "dummy_x25519_key";   // TODO: Generate real keys
-    connect_req.ed25519_pub = "dummy_ed25519_key"; // TODO: Generate real keys
+    connect_req.ed25519_pub = "dummy_ed25519_key"; // TODO: Generate real Ed25519 public key
 
     // Convert to JSON
     nlohmann::json j = connect_req;
@@ -164,8 +164,15 @@ void TribuneClient::onEventAnnouncement(const Event &event) {
   std::cout << "=== EVENT RECEIVED ===" << std::endl;
   std::cout << "Event ID: " << event.event_id << std::endl;
   std::cout << "Event Type: " << event.type_ << std::endl;
+  std::cout << "Computation Type: " << event.computation_type << std::endl;
   std::cout << "Participants: " << event.participants.size() << std::endl;
   std::cout << "======================" << std::endl;
+
+  // Store event for validation and computation
+  {
+    std::lock_guard<std::mutex> lock(active_events_mutex_);
+    active_events_[event.event_id] = event;
+  }
 
   // Use data collection module to get client's data for this event
   std::string my_data;
@@ -179,6 +186,13 @@ void TribuneClient::onEventAnnouncement(const Event &event) {
       std::cout << "Warning: No data collection module configured!"
                 << std::endl;
     }
+  }
+
+  // Store our own data shard
+  {
+    std::lock_guard<std::mutex> shards_lock(event_shards_mutex_);
+    event_shards_[event.event_id][client_id_] = my_data;
+    std::cout << "Stored our own shard for event " << event.event_id << std::endl;
   }
 
   shareDataWithPeers(event, my_data);
@@ -200,20 +214,44 @@ void TribuneClient::onPeerDataReceived(const PeerDataMessage &peer_msg) {
     if (it != active_events_.end()) {
       // Check if this client is actually an expected participant of the event
       bool valid_participant = false;
-
-      //@TODO : At some point we're going to want to use e. ppke
+      std::string sender_public_key;
+      
       for (const auto &participant : it->second.participants) {
         if (participant.client_id == peer_msg.from_client) {
           valid_participant = true;
+          sender_public_key = participant.ed25519_pub;
           break;
         }
       }
 
       if (valid_participant) {
-        std::lock_guard<std::mutex> shards_lock(event_shards_mutex_);
-        event_shards_[peer_msg.event_id][peer_msg.from_client] = peer_msg.data;
-        std::cout << "Stored valid shard from " << peer_msg.from_client
-                  << std::endl;
+        // Verify signature
+        std::string message = peer_msg.event_id + "|" + peer_msg.from_client + "|" + peer_msg.data;
+        bool signature_valid = SignatureUtils::verifySignature(message, peer_msg.signature, sender_public_key);
+        
+        if (signature_valid) {
+          bool all_shards_received = false;
+          {
+            std::lock_guard<std::mutex> shards_lock(event_shards_mutex_);
+            event_shards_[peer_msg.event_id][peer_msg.from_client] = peer_msg.data;
+            std::cout << "Stored valid and authenticated shard from " << peer_msg.from_client
+                      << std::endl;
+            
+            // Check if we now have all shards
+            all_shards_received = hasAllShards(peer_msg.event_id);
+          }
+          
+          // If complete, spawn thread to compute result
+          if (all_shards_received) {
+            std::cout << "All shards received for event " << peer_msg.event_id << ", starting computation" << std::endl;
+            std::thread([this, event_id = peer_msg.event_id]() {
+              computeAndSubmitResult(event_id);
+            }).detach();
+          }
+        } else {
+          std::cout << "Rejected shard with invalid signature from: "
+                    << peer_msg.from_client << std::endl;
+        }
       } else {
         std::cout << "Rejected shard from unauthorized client: "
                   << peer_msg.from_client << std::endl;
@@ -272,6 +310,10 @@ void TribuneClient::shareDataWithPeers(const Event &event,
       peer_msg.from_client = client_id_;
       peer_msg.data = my_data;
       peer_msg.timestamp = std::chrono::system_clock::now();
+      
+      // Create signature
+      std::string message = peer_msg.event_id + "|" + peer_msg.from_client + "|" + peer_msg.data;
+      peer_msg.signature = SignatureUtils::createSignature(message, ed25519_private_key_);
 
       nlohmann::json payload = peer_msg;
 
@@ -290,6 +332,83 @@ void TribuneClient::shareDataWithPeers(const Event &event,
                 << e.what() << std::endl;
     }
   }
+}
+
+bool TribuneClient::hasAllShards(const std::string& event_id) {
+  // Must be called with active_events_mutex_ and event_shards_mutex_ held
+  auto event_it = active_events_.find(event_id);
+  if (event_it == active_events_.end()) {
+    return false;
+  }
+
+  auto shards_it = event_shards_.find(event_id);
+  if (shards_it == event_shards_.end()) {
+    return false;
+  }
+
+  const Event& event = event_it->second;
+  const auto& received_shards = shards_it->second;
+  
+  // Check if we have shards from all participants (including ourselves)
+  for (const auto& participant : event.participants) {
+    if (received_shards.find(participant.client_id) == received_shards.end()) {
+      return false;
+    }
+  }
+  
+  return true;
+}
+
+void TribuneClient::computeAndSubmitResult(const std::string& event_id) {
+  std::cout << "=== COMPUTING RESULT FOR EVENT: " << event_id << " ===" << std::endl;
+  
+  Event event;
+  std::vector<std::string> shards;
+  std::string computation_type;
+  
+  // Collect event info and shards
+  {
+    std::lock_guard<std::mutex> active_lock(active_events_mutex_);
+    std::lock_guard<std::mutex> shards_lock(event_shards_mutex_);
+    
+    auto event_it = active_events_.find(event_id);
+    auto shards_it = event_shards_.find(event_id);
+    
+    if (event_it == active_events_.end() || shards_it == event_shards_.end()) {
+      std::cout << "Error: Event or shards not found for " << event_id << std::endl;
+      return;
+    }
+    
+    event = event_it->second;
+    computation_type = event.computation_type;
+    
+    // Collect shards in participant order for consistency
+    for (const auto& participant : event.participants) {
+      auto shard_it = shards_it->second.find(participant.client_id);
+      if (shard_it != shards_it->second.end()) {
+        shards.push_back(shard_it->second);
+      }
+    }
+  }
+  
+  // Find and execute computation
+  std::string result;
+  {
+    std::lock_guard<std::mutex> comp_lock(computations_mutex_);
+    auto comp_it = computations_.find(computation_type);
+    
+    if (comp_it == computations_.end()) {
+      std::cout << "Error: No computation registered for type: " << computation_type << std::endl;
+      return;
+    }
+    
+    result = comp_it->second->compute(shards);
+  }
+  
+  std::cout << "Computation complete! Result: " << result << std::endl;
+  
+  // TODO: Send EventResponse back to server with result
+  std::cout << "TODO: Send result '" << result << "' back to server for event " << event_id << std::endl;
 }
 
 void TribuneClient::stop() {

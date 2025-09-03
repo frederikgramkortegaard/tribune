@@ -68,8 +68,7 @@ void TribuneServer::handleEndpointConnect(const httplib::Request &req,
               << parsed_res.client_id << std::endl;
 
     ClientState state(parsed_res.client_host, parsed_res.client_port,
-                      parsed_res.client_id, parsed_res.x25519_pub,
-                      parsed_res.ed25519_pub);
+                      parsed_res.client_id, parsed_res.ed25519_pub);
 
     std::cout << "Adding client to roster with ID: '" << parsed_res.client_id
               << "'" << std::endl;
@@ -170,6 +169,7 @@ std::vector<ClientInfo> TribuneServer::selectParticipants() {
       info.client_id = client_state.client_id;
       info.client_host = client_state.client_host;
       info.client_port = client_state.client_port;
+      info.ed25519_pub = client_state.ed25519_pub;
       active_clients.push_back(info);
     }
   }

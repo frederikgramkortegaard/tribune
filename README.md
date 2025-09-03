@@ -9,6 +9,8 @@ The system allows multiple parties to collaboratively train ML models, perform s
 
 :pushpin: [Development TODO](https://github.com/frederikgramkortegaard/tribune/blob/master/TODO.md)
 
+:page_facing_up: [Design Decisions](https://github.com/frederikgramkortegaard/tribune/blob/master/DESIGN_DECISIONS.md)
+
 ## Architecture
 
 The `src/` directory contains the core library for distributed MPC. Public API includes:
