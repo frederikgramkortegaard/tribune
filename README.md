@@ -7,6 +7,10 @@ The system allows multiple parties to collaboratively train ML models, perform s
 
 **Security Model:** This uses a star topology with centralized coordination, which has obvious trust and single-point-of-failure issues. We assume an honest-but-curious adversary model - the server coordinates but doesn't see raw client data. Not suitable for truly adversarial environments where you can't trust the coordinator.
 
+:pushpin: [Development TODO](https://github.com/frederikgramkortegaard/tribune/blob/master/TODO.md)
+
+:speech_balloon: See the TODO for current implementation status and planned features.
+
 ## Architecture
 
 The `src/` directory contains the core library for distributed MPC. Public API is just two classes:
@@ -25,5 +29,3 @@ The `apps/` directory has specific applications that use the library:
 Regular p2p system, but event-driven. Server publishes computation specs (could be SQL table structures or ML model definitions), clients subscribe with their endpoints, then we get this publisher-consumer MPC system where data stays distributed.
 
 Future: integrate blockchain payments for computation contributions.
-
-:pushpin: [Development TODO](https://github.com/frederikgramkortegaard/tribune/blob/master/TODO.md)
