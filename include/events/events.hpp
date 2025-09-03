@@ -37,6 +37,12 @@ struct ClientInfo {
   std::string client_port;
 };
 
+struct PeerDataMessage {
+  std::string event_id;
+  std::string from_client;
+  std::string data;
+};
+
 // JSON conversion functions for Event
 inline void to_json(nlohmann::json &j, const Event &e) {
   j = nlohmann::json{{"type", e.type_}, {"event_id", e.event_id}, {"participants", e.participants}};
@@ -101,4 +107,17 @@ inline void from_json(const nlohmann::json &j, ClientInfo &c) {
   j.at("client_id").get_to(c.client_id);
   j.at("client_host").get_to(c.client_host);
   j.at("client_port").get_to(c.client_port);
+}
+
+// JSON conversion functions for PeerDataMessage
+inline void to_json(nlohmann::json &j, const PeerDataMessage &p) {
+  j = nlohmann::json{{"event_id", p.event_id},
+                     {"from_client", p.from_client},
+                     {"data", p.data}};
+}
+
+inline void from_json(const nlohmann::json &j, PeerDataMessage &p) {
+  j.at("event_id").get_to(p.event_id);
+  j.at("from_client").get_to(p.from_client);
+  j.at("data").get_to(p.data);
 }

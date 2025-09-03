@@ -1,4 +1,5 @@
 #include "client/tribune_client.hpp"
+#include "client/data_collection_module.hpp"
 #include "protocol/parser.hpp"
 #include <iomanip>
 #include <iostream>
@@ -12,6 +13,9 @@ TribuneClient::TribuneClient(const std::string &seed_host, int seed_port,
 
   client_id_ = generateUUID();
   setupEventRoutes();
+  
+  // Set default mock data collection module
+  data_module_ = std::make_unique<MockDataCollectionModule>(client_id_);
 
   std::cout << "Created TribuneClient with ID: " << client_id_ << std::endl;
   std::cout << "Will connect to seed: " << seed_host_ << ":" << seed_port_
@@ -20,6 +24,11 @@ TribuneClient::TribuneClient(const std::string &seed_host, int seed_port,
 }
 
 TribuneClient::~TribuneClient() { stop(); }
+
+void TribuneClient::setDataCollectionModule(std::unique_ptr<DataCollectionModule> module) {
+  data_module_ = std::move(module);
+  std::cout << "Data collection module updated" << std::endl;
+}
 
 std::string TribuneClient::generateUUID() {
   // Simple UUID v4 generation using random numbers
@@ -105,6 +114,31 @@ void TribuneClient::setupEventRoutes() {
                           "application/json");
         }
       });
+
+  // Setup the /peer-data endpoint to receive data from other clients
+  event_server_.Post("/peer-data", [this](const httplib::Request &req,
+                                          httplib::Response &res) {
+    try {
+      std::cout << "Received peer data: " << req.body << std::endl;
+
+      // Parse the peer data message
+      nlohmann::json j = nlohmann::json::parse(req.body);
+      PeerDataMessage peer_msg = j.get<PeerDataMessage>();
+
+      // Handle the peer data
+      onPeerDataReceived(peer_msg);
+
+      // Send response
+      res.status = 200;
+      res.set_content("{\"status\":\"received\"}", "application/json");
+
+    } catch (const std::exception &e) {
+      std::cout << "Error processing peer data: " << e.what() << std::endl;
+      res.status = 400;
+      res.set_content("{\"error\":\"Failed to process peer data\"}",
+                      "application/json");
+    }
+  });
 }
 
 void TribuneClient::startListening() {
@@ -125,10 +159,31 @@ void TribuneClient::onEventAnnouncement(const Event &event) {
   std::cout << "Participants: " << event.participants.size() << std::endl;
   std::cout << "======================" << std::endl;
 
-  // TODO: This is where data collection modules would be called
-  // For now, just acknowledge receipt and share dummy data
-  std::string my_data = "dummy_data_from_" + client_id_;
+  // Use data collection module to get client's data for this event
+  std::string my_data;
+  if (data_module_) {
+    my_data = data_module_->collectData(event);
+    std::cout << "Collected data: " << my_data << std::endl;
+  } else {
+    my_data = "no_data_module_configured";
+    std::cout << "Warning: No data collection module configured!" << std::endl;
+  }
+  
   shareDataWithPeers(event, my_data);
+}
+
+void TribuneClient::onPeerDataReceived(const PeerDataMessage &peer_msg) {
+  std::cout << "=== PEER DATA RECEIVED ===" << std::endl;
+  std::cout << "Event ID: " << peer_msg.event_id << std::endl;
+  std::cout << "From Client: " << peer_msg.from_client << std::endl;
+  std::cout << "Data: " << peer_msg.data << std::endl;
+  std::cout << "===========================" << std::endl;
+
+  // TODO: Process the received peer data
+  // - Store it for aggregation
+  // - Check if we have data from all expected peers
+  // - Perform computation when ready
+  // - Eventually send EventResponse back to server
 }
 
 void TribuneClient::shareDataWithPeers(const Event &event,
@@ -144,6 +199,8 @@ void TribuneClient::shareDataWithPeers(const Event &event,
 
     std::cout << "Sending data to peer: " << peer.client_id << " at "
               << peer.client_host << ":" << peer.client_port << std::endl;
+
+    // Split data into len(event.participants) - 1 shards
 
     try {
       httplib::Client cli(peer.client_host, std::stoi(peer.client_port));
