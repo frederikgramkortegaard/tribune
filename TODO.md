@@ -1,10 +1,11 @@
 # TODO
 
-## Client Response Tracking
-- [ ] Add `std::unordered_map<std::string, std::unordered_map<std::string, PeerDataMessage>> received_peer_data` to client  
-- [ ] Periodic check if all participants responded for each event
-- [ ] Send EventResponse back to server when aggregation complete
-- [ ] Handle timeouts/missing peers
+## MPC Computation Execution
+- [ ] Check if all expected shards received for an event
+- [ ] Execute registered computation when complete
+- [ ] Send EventResponse back to server with aggregated result
+- [ ] Handle timeouts/missing participants
+- [ ] Process orphan shards when event announcement arrives
 
 ## Crypto + MPC
 - [ ] Pick crypto lib (libsodium?)
@@ -37,3 +38,10 @@
 - [x] Pluggable DataCollectionModule interface
 - [x] MockDataCollectionModule for development
 - [x] Client data collection on event announcement
+
+### MPC Computation Framework
+- [x] MPCComputation abstract interface for pluggable computation types
+- [x] SumComputation implementation for integer aggregation
+- [x] Computation registry system in TribuneClient
+- [x] Event computation_type field with JSON serialization
+- [x] Thread-safe shard validation and storage with orphan handling

@@ -11,9 +11,10 @@ The system allows multiple parties to collaboratively train ML models, perform s
 
 ## Architecture
 
-The `src/` directory contains the core library for distributed MPC. Public API is just two classes:
+The `src/` directory contains the core library for distributed MPC. Public API includes:
 - **TribuneServer** - Coordinates computation events and manages client roster
 - **TribuneClient** - Connects to servers and handles computation events
+- **MPCComputation** - Pluggable interface for different computation types (sum, average, ML training, etc.)
 
 Everything else (protocol parsing, JSON serialization, client state management) is internal implementation.
 
