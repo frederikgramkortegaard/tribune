@@ -1,7 +1,25 @@
 
-okay so, regular p2p system, secure multi-party compute system, but here is how it's going to work from the Product perspective;
+# tribune
 
-I as a server, can publish a SQL Table structure, literally using e.g. SQL table definitions, and then people can Subscribe to this, a long with the IP of the end-receiver,
-and then we can have this event-driven publisher-consumer MPC system
+A secure multi-party computation system with star topology networking.
 
-possibly for future, we can make sure people are paid via blockchain even.
+**Note:** This uses a star topology with centralized coordination, which has obvious trust and single-point-of-failure issues. We assume an honest-but-curious adversary model - the server coordinates but doesn't see raw client data. Not suitable for truly adversarial environments where you can't trust the coordinator.
+
+## Architecture
+
+The `src/` directory contains the core library for distributed MPC. Public API is just two classes:
+- **TribuneServer** - Coordinates computation events and manages client roster
+- **TribuneClient** - Connects to servers and handles computation events
+
+Everything else (protocol parsing, JSON serialization, client state management) is internal implementation.
+
+The `apps/` directory has specific applications that use the library:
+- `server_app` - Basic server that announces computation events every 40 seconds
+- `client_app` - Simple client that connects and listens for events
+- `mpc-ai-training` - (planned) Train ML models like linear regression using MPC so raw data never leaves client machines
+
+## Product Vision
+
+Regular p2p system, but event-driven. Server publishes computation specs (could be SQL table structures or ML model definitions), clients subscribe with their endpoints, then we get this publisher-consumer MPC system where data stays distributed.
+
+Future: integrate blockchain payments for computation contributions.
