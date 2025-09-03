@@ -407,8 +407,38 @@ void TribuneClient::computeAndSubmitResult(const std::string& event_id) {
   
   std::cout << "Computation complete! Result: " << result << std::endl;
   
-  // TODO: Send EventResponse back to server with result
-  std::cout << "TODO: Send result '" << result << "' back to server for event " << event_id << std::endl;
+  // Send EventResponse back to server with result
+  try {
+    httplib::Client cli(seed_host_, seed_port_);
+    
+    EventResponse response;
+    response.type_ = ResponseType::DataPart;
+    response.event_id = event_id;
+    response.client_id = client_id_;
+    response.data = result;
+    response.timestamp = std::chrono::system_clock::now();
+    
+    // Convert to JSON
+    nlohmann::json j = response;
+    std::string json_body = j.dump();
+    
+    std::cout << "Sending computation result to server..." << std::endl;
+    auto res = cli.Post("/submit", json_body, "application/json");
+    
+    if (res && res->status == 200) {
+      std::cout << "Successfully sent result to server!" << std::endl;
+      std::cout << "Server response: " << res->body << std::endl;
+    } else {
+      std::cout << "Failed to send result to server. Status: "
+                << (res ? std::to_string(res->status) : "No response") << std::endl;
+      if (res) {
+        std::cout << "Response body: " << res->body << std::endl;
+      }
+    }
+    
+  } catch (const std::exception &e) {
+    std::cout << "Exception sending result to server: " << e.what() << std::endl;
+  }
 }
 
 void TribuneClient::stop() {

@@ -92,9 +92,11 @@ void TribuneServer::handleEndpointSubmit(const httplib::Request &req,
 
   if (auto result = parseSubmitResponse(req.body)) {
     EventResponse parsed_res = *result;
-    std::cout << "Succesfully parsed SubmitResponse from Client with ID: "
-              << parsed_res.client_id << ", for Event: " << parsed_res.event_id
-              << std::endl;
+    std::cout << "=== COMPUTATION RESULT RECEIVED ===" << std::endl;
+    std::cout << "From Client: " << parsed_res.client_id << std::endl;
+    std::cout << "Event ID: " << parsed_res.event_id << std::endl;
+    std::cout << "Result: " << parsed_res.data << std::endl;
+    std::cout << "====================================" << std::endl;
 
     std::cout << "Checking if client '" << parsed_res.client_id
               << "' is in roster..." << std::endl;
