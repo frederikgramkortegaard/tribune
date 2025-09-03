@@ -1,4 +1,4 @@
-#include "client/client.hpp"
+#include "client/tribune_client.hpp"
 #include "protocol/parser.hpp"
 #include <iostream>
 #include <random>

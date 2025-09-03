@@ -29,5 +29,5 @@ add_executable(server_app apps/server_app.cpp src/server/tribune_server.cpp src/
 target_link_libraries(server_app PRIVATE httplib::httplib nlohmann_json::nlohmann_json)
 
 # Client executable
-add_executable(client_app apps/client_app.cpp src/client/client.cpp src/protocol/parser.cpp)
+add_executable(client_app apps/client_app.cpp src/client/tribune_client.cpp src/protocol/parser.cpp)
 target_link_libraries(client_app PRIVATE httplib::httplib nlohmann_json::nlohmann_json)
