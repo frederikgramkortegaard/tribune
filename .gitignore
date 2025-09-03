@@ -1,0 +1,45 @@
+# Compiled binaries and object files
+*.exe
+*.dll
+*.obj
+*.o
+*.pdb
+*.lib
+
+# Intermediate build files
+build/
+cmake-build-*/
+Release/
+Debug/
+bin/
+obj/
+
+# IDE-specific files
+.vs/
+.idea/
+.vscode/
+*.sln.suo
+*.user
+*.vcxproj.user
+*.filters
+*.vcproj
+*.ncb
+*.aps
+*.bsc
+*.sbr
+*.tlog
+
+# Temporary files
+*.log
+*.tmp
+temp/
+
+# Dependency directories (if applicable)
+# For example, if using Conan:
+conan_build/
+conan_install/
+
+# Other common ignore patterns
+*.swp
+*.bak
+*~
