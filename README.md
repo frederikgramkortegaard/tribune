@@ -34,7 +34,7 @@ Future: integrate blockchain payments for computation contributions.
 
 ## Quick Start
 
-### Build and Run Demo
+### Build
 
 ```bash
 # Using CMake (recommended)
@@ -44,9 +44,6 @@ make
 
 # Or using Makefile (simple)
 make all
-
-# Run the full MPC demonstration
-make demo
 ```
 
 ### Debug Build with Logging
@@ -64,14 +61,7 @@ make
 ./client_app 9001 private_key_1 public_key_1
 ```
 
-**Debug Build Features:**
-- `DEBUG_INFO`: General information about operations
-- `DEBUG_DEBUG`: Detailed tracing of computation steps, event processing
-- `DEBUG_WARN`: Warnings about parsing errors or invalid data  
-- `DEBUG_ERROR`: Error conditions that don't cause termination
-- `LOG`: Always-on messages (works in both debug and release builds)
-
-**Release Build** (default): All debug macros become no-ops for optimal performance.
+**Release Build** (default): Optimized for performance with minimal logging.
 
 ```bash
 # Release build (default) - minimal logging
@@ -163,22 +153,67 @@ int main() {
 }
 ```
 
-### Manual Testing
+### Testing the Network
+
+To test out the network, run the demo script:
 
 ```bash
-# Terminal 1: Start server
-./server_app
-
-# Terminal 2-N: Start clients on different ports  
-./client_app 9001 private_key_1 public_key_1
-./client_app 9002 private_key_2 public_key_2
-# ... etc
+python3 scripts/run_demo.py
 ```
 
-### Demo Script Features
+The script automatically generates unique Ed25519 keypairs for each client, spawns 1 server + 10 clients with colored output, shows real-time MPC computation results, and handles graceful shutdown with Ctrl+C.
 
-The `scripts/run_demo.py` script automatically:
-- Generates unique Ed25519 keypairs for each client
-- Spawns 1 server + 10 clients with colored output
-- Shows real-time MPC computation results
-- Handles graceful shutdown with Ctrl+C
+### DataCollectionModule Implementation Example
+
+Here's a practical example showing how to implement all three methods:
+
+```cpp
+#include "client/data_collection_module.hpp"
+#include <random>
+#include <numeric>
+
+class TemperatureSensorModule : public DataCollectionModule {
+public:
+    // Collect temperature data from sensor
+    std::string collectData(const Event& event) override {
+        double temperature = readTemperatureSensor(); // e.g., 23.5°C
+        return std::to_string(temperature);
+    }
+    
+    // Split temperature into cryptographically secure shards
+    std::vector<std::string> shardData(const std::string& data, int num_shards) override {
+        double value = std::stod(data);
+        
+        std::random_device rd;
+        std::mt19937 gen(rd());
+        std::uniform_real_distribution<double> dis(-100.0, 100.0);
+        
+        std::vector<std::string> shards;
+        double sum = 0.0;
+        
+        // Generate random shards
+        for (int i = 0; i < num_shards - 1; i++) {
+            double shard = dis(gen);
+            shards.push_back(std::to_string(shard));
+            sum += shard;
+        }
+        
+        // Final shard ensures sum equals original value
+        shards.push_back(std::to_string(value - sum));
+        return shards;
+    }
+    
+    // Compute average temperature across all multi-party computation sub-results
+    std::string aggregateData(const Event& event, 
+                            const std::vector<std::string>& peer_data) override {
+
+        // return sum of peer_data ....
+    }
+    
+private:
+    double readTemperatureSensor() {
+        // Mock sensor reading
+        return 20.0 + (rand() % 20); // 20-40°C
+    }
+};
+```
