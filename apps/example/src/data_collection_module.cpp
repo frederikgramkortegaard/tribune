@@ -1,4 +1,4 @@
-#include "client/data_collection_module.hpp"
+#include "../include/data_collection_module.hpp"
 #include "utils/logging.hpp"
 #include <random>
 #include <sstream>

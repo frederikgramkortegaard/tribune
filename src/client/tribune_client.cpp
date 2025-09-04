@@ -1,4 +1,3 @@
-#include "client/data_collection_module.hpp"
 #include "client/tribune_client.hpp"
 #include "protocol/parser.hpp"
 #include "utils/logging.hpp"
@@ -29,9 +28,6 @@ TribuneClient::TribuneClient(const std::string &seed_host, int seed_port,
   }
 
   setupEventRoutes();
-
-  // Set default mock data collection module
-  data_module_ = std::make_unique<MockDataCollectionModule>(client_id_);
 
   LOG("Created TribuneClient with ID: " << client_id_);
   DEBUG_INFO("Will connect to seed: " << seed_host_ << ":" << seed_port_);
@@ -194,6 +190,17 @@ void TribuneClient::setupEventRoutes() {
 }
 
 void TribuneClient::startListening() {
+  // Check if a data collection module is configured
+  {
+    std::lock_guard<std::mutex> lock(data_module_mutex_);
+    if (!data_module_) {
+      DEBUG_ERROR(
+          "Cannot start listening: No data collection module configured!");
+      DEBUG_ERROR("Call setDataCollectionModule() before startListening()");
+      return;
+    }
+  }
+
   running_ = true;
   listener_thread_ = std::thread(&TribuneClient::runEventListener, this);
   LOG("Started event listener on port " << listen_port_);
@@ -226,8 +233,10 @@ void TribuneClient::onEventAnnouncement(const Event &event, bool relay) {
       my_data = data_module_->collectData(event);
       DEBUG_DEBUG("Collected data: " << my_data);
     } else {
-      my_data = "no_data_module_configured";
-      DEBUG_WARN("No data collection module configured!");
+      // This should never happen if we prevent listening without a module
+      DEBUG_ERROR(
+          "INTERNAL ERROR: No data module configured but client is listening!");
+      return;
     }
   }
 
@@ -245,6 +254,10 @@ void TribuneClient::onEventAnnouncement(const Event &event, bool relay) {
       DEBUG_ERROR("Error parsing own data JSON: " << e.what());
     }
   }
+
+  // Add a small delay to ensure all participants receive the event announcement
+  // before peer data sharing begins (prevents race conditions)
+  std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
   if (relay) {
     shareDataWithPeers(event, my_data);

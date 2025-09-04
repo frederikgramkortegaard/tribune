@@ -127,7 +127,7 @@ int main() {
 ```cpp
 #include "client/tribune_client.hpp"
 #include "mpc/sum_computation.hpp"
-#include "data/simple_data_collection.hpp"
+#include "client/data_collection_module.hpp" // For DataCollectionModule interface
 
 int main() {
     // Create client connecting to localhost:8080, listening on port 18001
@@ -142,8 +142,9 @@ int main() {
     
     // Register data collection module (how client fetches its data)
     // this could be a custom SQL query interface, an HTTP connection to temperature sensor
-    // or anything similar, it will be polled whenver the client receives an Announcement
-    client.setDataCollectionModule(std::make_unique<SimpleDataCollectionModule>());
+    // or anything similar, it will be polled whenever the client receives an Announcement
+    // You must implement your own DataCollectionModule subclass
+    client.setDataCollectionModule(std::make_unique<YourDataCollectionModule>());
     
     // Connect to server
     if (!client.connectToSeed()) {

@@ -1,5 +1,6 @@
 #pragma once
 #include <string>
+#include <vector>
 #include "events/events.hpp"
 
 // Abstract interface for data collection modules
@@ -15,15 +16,4 @@ public:
                                     const std::vector<std::string>& peer_data) {
         return ""; // Default: no aggregation
     }
-};
-
-// Mock implementation for development/testing
-class MockDataCollectionModule : public DataCollectionModule {
-public:
-    MockDataCollectionModule(const std::string& client_id) : client_id_(client_id) {}
-    
-    std::string collectData(const Event& event) override;
-    
-private:
-    std::string client_id_;
 };

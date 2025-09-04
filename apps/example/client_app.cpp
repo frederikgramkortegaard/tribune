@@ -1,5 +1,6 @@
 #include "client/tribune_client.hpp"
 #include "mpc/mpc_computation.hpp"
+#include "include/data_collection_module.hpp"
 #include <iostream>
 #include <thread>
 #include <chrono>
@@ -29,6 +30,9 @@ int main(int argc, char* argv[]) {
     
     // Register the sum computation
     client.registerComputation("sum", std::make_unique<SumComputation>());
+    
+    // Set up data collection module (required before listening)
+    client.setDataCollectionModule(std::make_unique<MockDataCollectionModule>(client.getClientId()));
     
     // Connect to the seed node (server)
     if (!client.connectToSeed()) {
