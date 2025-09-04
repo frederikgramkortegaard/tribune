@@ -2,11 +2,9 @@
 
 
 ## MPC Computation Execution
-- [ ] Check if all expected shards received for an event
-- [ ] Handle timeouts/missing participants
+- [ ] Handle timeouts/missing participants (have event-level timeouts, good enough for now)
 
-## Crypto + MPC
-- [ ] Pick crypto lib (libsodium?)
+## Real-World Implementation
 - [ ] Try to implement a real usecase using a non-mock data collection module
 
 ## Data Formats
