@@ -240,18 +240,16 @@ void TribuneClient::onEventAnnouncement(const Event &event, bool relay) {
     }
   }
 
-  // Store our own data shard (extract just the value from JSON)
+  // Store our own data shard (data is now a plain string number)
   {
     std::lock_guard<std::mutex> shards_lock(event_shards_mutex_);
     try {
-      nlohmann::json data_json = nlohmann::json::parse(my_data);
-      std::string shard_value =
-          std::to_string(data_json["value"].get<double>());
+      std::string shard_value = my_data;
       event_shards_[event.event_id][client_id_] = shard_value;
       DEBUG_DEBUG("Stored our own shard for event "
                   << event.event_id << " (value: " << shard_value << ")");
     } catch (const std::exception &e) {
-      DEBUG_ERROR("Error parsing own data JSON: " << e.what());
+      DEBUG_ERROR("Error storing own data: " << e.what());
     }
   }
 
@@ -403,14 +401,13 @@ void TribuneClient::onPeerDataReceived(const PeerDataMessage &peer_msg) {
   {
     std::lock_guard<std::mutex> shards_lock(event_shards_mutex_);
     try {
-      nlohmann::json data_json = nlohmann::json::parse(peer_msg.data);
-      std::string shard_value =
-          std::to_string(data_json["value"].get<double>());
+      // peer_msg.data is now a plain string number, not JSON
+      std::string shard_value = peer_msg.data;
       event_shards_[peer_msg.event_id][peer_msg.from_client] = shard_value;
       DEBUG_DEBUG("Stored valid shard from "
                   << peer_msg.from_client << " (value: " << shard_value << ")");
     } catch (const std::exception &e) {
-      DEBUG_DEBUG("Error parsing peer data JSON: " << e.what());
+      DEBUG_DEBUG("Error processing peer data: " << e.what());
       return;
     }
 
