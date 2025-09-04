@@ -2,8 +2,10 @@
 #include "utils/logging.hpp"
 #include <iostream>
 #include <stdexcept>
+#include <nlohmann/json.hpp>
 
-std::string SumComputation::compute(const std::vector<std::string> &shards) {
+std::string SumComputation::compute(const std::vector<std::string> &shards, 
+                                   const nlohmann::json &metadata) {
   int total = 0;
 
   DEBUG_DEBUG("=== COMPUTING SUM ===");

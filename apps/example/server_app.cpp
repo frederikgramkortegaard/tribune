@@ -38,9 +38,17 @@ int main() {
             << std::endl;
 
   std::string result;
-  if (auto event = server.createEvent(EventType::DataSubmission, event_id)) {
+  if (auto event = server.createEvent(EventType::DataRequestEvent, event_id)) {
+    // Add metadata to demonstrate flexible data requests
+    event->computation_metadata = {
+        {"date_range", "2024-01-01 to 2024-12-31"},
+        {"min_value", 10},
+        {"max_value", 100}
+    };
+    
     std::cout << "Created event: " << event_id << " with "
               << event->participants.size() << " participants" << std::endl;
+    std::cout << "Metadata: " << event->computation_metadata.dump() << std::endl;
     server.announceEvent(*event, &result);
     std::cout << "Event announced. Waiting for completion..." << std::endl;
     

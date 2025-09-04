@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-enum EventType { DataSubmission = 0 };
+enum EventType { DataRequestEvent = 0 };
 enum ResponseType { DataPart = 0, ConnectionRequest };
 
 struct ClientInfo {
@@ -19,11 +19,12 @@ struct Event {
   EventType type_;
   std::string event_id;
   std::string computation_type;
+  nlohmann::json computation_metadata;  // Flexible metadata for data collection and computation
   std::vector<ClientInfo> participants;
   std::string server_signature;  // Server signature for verification
   std::chrono::time_point<std::chrono::system_clock> timestamp;  // Event creation time
   
-  Event() : timestamp(std::chrono::system_clock::now()) {}
+  Event() : timestamp(std::chrono::system_clock::now()), computation_metadata(nlohmann::json::object()) {}
 };
 
 struct EventResponse {
@@ -69,6 +70,7 @@ inline void to_json(nlohmann::json &j, const Event &e) {
     {"type", e.type_}, 
     {"event_id", e.event_id}, 
     {"computation_type", e.computation_type}, 
+    {"computation_metadata", e.computation_metadata},
     {"participants", e.participants},
     {"server_signature", e.server_signature},
     {"timestamp", std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -80,6 +82,13 @@ inline void from_json(const nlohmann::json &j, Event &e) {
   j.at("type").get_to(e.type_);
   j.at("event_id").get_to(e.event_id);
   j.at("computation_type").get_to(e.computation_type);
+  
+  if (j.contains("computation_metadata")) {
+    j.at("computation_metadata").get_to(e.computation_metadata);
+  } else {
+    e.computation_metadata = nlohmann::json::object();
+  }
+  
   j.at("participants").get_to(e.participants);
   
   if (j.contains("server_signature")) {

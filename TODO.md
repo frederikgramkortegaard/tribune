@@ -39,6 +39,7 @@
 - [x] Computation registry system in TribuneClient
 - [x] Event computation_type field with JSON serialization
 - [x] Thread-safe shard validation and storage
+- [x] Check if all expected shards received for an event (hasAllShards())
 - [x] Execute registered computation when complete
 - [x] Send EventResponse back to server with aggregated result
 

@@ -9,6 +9,7 @@ public:
     virtual ~DataCollectionModule() = default;
     
     // Called when client receives an event and needs to provide data
+    // The event contains computation_metadata that can guide data collection
     virtual std::string collectData(const Event& event) = 0;
     
     // Split data into cryptographically secure shards for secret sharing

@@ -553,7 +553,7 @@ void TribuneClient::computeAndSubmitResult(const std::string &event_id) {
       return;
     }
 
-    result = comp_it->second->compute(shards);
+    result = comp_it->second->compute(shards, event.computation_metadata);
   }
 
   LOG("Computation complete! Result: " << result);

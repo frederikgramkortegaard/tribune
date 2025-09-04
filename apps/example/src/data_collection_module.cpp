@@ -10,11 +10,27 @@ std::string MockDataCollectionModule::collectData(const Event &event) {
   std::hash<std::string> hasher;
   size_t client_hash = hasher(client_id_);
 
-  // Use hash to generate a value between 10-50 for easier math verification
-  int predictable_value = 10 + (client_hash % 41); // 10-50 range
+  // Use metadata to adjust data generation
+  int min_val = 10;
+  int max_val = 50;
+  
+  if (!event.computation_metadata.empty()) {
+    DEBUG_DEBUG("Received metadata: " << event.computation_metadata.dump());
+    
+    if (event.computation_metadata.contains("min_value")) {
+      min_val = event.computation_metadata["min_value"];
+    }
+    if (event.computation_metadata.contains("max_value")) {
+      max_val = event.computation_metadata["max_value"];
+    }
+  }
+  
+  // Use hash to generate a value within the specified range
+  int range = max_val - min_val + 1;
+  int predictable_value = min_val + (client_hash % range);
 
-  DEBUG_DEBUG("Client " << client_id_ << " generated predictable value: "
-                        << predictable_value);
+  DEBUG_DEBUG("Client " << client_id_ << " generated value: "
+                        << predictable_value << " (range: " << min_val << "-" << max_val << ")");
 
   return std::to_string(predictable_value);
 }

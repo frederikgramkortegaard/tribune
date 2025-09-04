@@ -78,10 +78,16 @@ int main() {
     // Wait for clients to connect and register with the server
     std::this_thread::sleep_for(std::chrono::seconds(10));
     
-    // Create and announce a computation event
-    // This selects participants and sends event announcements to all selected clients
+    // Create and announce a computation event with metadata
     std::string result;
-    if (auto event = server.createEvent(EventType::DataSubmission, "my-event")) {
+    if (auto event = server.createEvent(EventType::DataRequestEvent, "my-event")) {
+        // Add flexible metadata for data collection
+        event->computation_metadata = {
+            {"date", "2024-01-15"},
+            {"sensor_type", "temperature"},
+            {"min_threshold", 20}
+        };
+        
         server.announceEvent(*event, &result);
         
         // Wait for computation to complete
@@ -158,10 +164,19 @@ Here's a practical example showing how to implement all three methods:
 
 class TemperatureSensorModule : public DataCollectionModule {
 public:
-    // Collect temperature data from sensor
+    // Collect temperature data from sensor using event metadata
     std::string collectData(const Event& event) override {
-        double temperature = readTemperatureSensor(); // e.g., 23.5°C
-        return std::to_string(temperature);
+        // Use metadata to filter data collection
+        std::string date = event.computation_metadata.value("date", "today");
+        int min_threshold = event.computation_metadata.value("min_threshold", 0);
+        
+        double temperature = readTemperatureForDate(date);
+        
+        // Only return data if above threshold
+        if (temperature >= min_threshold) {
+            return std::to_string(temperature);
+        }
+        return "0"; // Or handle as needed
     }
     
     // Split temperature into cryptographically secure shards
@@ -195,8 +210,8 @@ public:
     }
     
 private:
-    double readTemperatureSensor() {
-        // Mock sensor reading
+    double readTemperatureForDate(const std::string& date) {
+        // Mock sensor reading for specific date
         return 20.0 + (rand() % 20); // 20-40°C
     }
 };
