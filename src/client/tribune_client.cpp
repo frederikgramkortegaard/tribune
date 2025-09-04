@@ -426,9 +426,9 @@ void TribuneClient::onPeerDataReceived(const PeerDataMessage &peer_msg) {
     }).detach();
   }
 
-  // Periodic cleanup
-  static int cleanup_counter = 0;
-  if (++cleanup_counter % 50 == 0) {
+  // Periodic cleanup of deduplication caches
+  // Triggered every CLEANUP_FREQUENCY peer messages to avoid timer threads
+  if (++cleanup_counter_ % CLEANUP_FREQUENCY == 0) {
     cleanupRecentItems();
   }
 }

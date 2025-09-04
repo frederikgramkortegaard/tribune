@@ -83,8 +83,10 @@ private:
   std::unordered_map<std::string, RecentItem> recent_events_;
   std::unordered_map<std::string, RecentItem> recent_shards_;  // event_id + "|" + client_id
   std::mutex recent_items_mutex_;
+  int cleanup_counter_ = 0;  // Counter for periodic cleanup
   static constexpr int RECENT_ITEMS_TTL_SECONDS = 60;  // 2x event timeout
   static constexpr int EVENT_TIMEOUT_SECONDS = 30;  // Match server timeout
+  static constexpr int CLEANUP_FREQUENCY = 50;  // Clean up every N peer messages
 
   // Private methods
   void runEventListener();
