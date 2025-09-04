@@ -14,16 +14,17 @@ The system allows multiple parties to collaboratively train ML models, perform s
 ## Architecture
 
 The `src/` directory contains the core library for distributed MPC. Public API includes:
-- **TribuneServer** - Coordinates computation events and manages client roster
-- **TribuneClient** - Connects to servers and handles computation events
+- **TribuneServer** - Coordinates computation events, manages client roster, and aggregates results
+- **TribuneClient** - Connects to servers, handles computation events, and participates in P2P data sharing
 - **MPCComputation** - Pluggable interface for different computation types (sum, average, ML training, etc.)
+- **DataCollectionModule** - Interface for clients to provide data (must be implemented by applications)
 
-Everything else (protocol parsing, JSON serialization, client state management) is internal implementation.
+Everything else (protocol parsing, JSON serialization, client state management, crypto utilities, logging) is internal implementation.
 
-The `apps/` directory has specific applications that use the library:
-- `server_app` - Basic server that announces computation events every 40 seconds
+The `apps/example/` directory has specific applications that use the library:
+- `server_app` - Basic server that creates and announces computation events
 - `client_app` - Simple client that connects and listens for events
-- `mpc-ai-training` - (planned) Train ML models like linear regression using MPC so raw data never leaves client machines
+- `MockDataCollectionModule` - Example data collection implementation for testing
 
 ## Product Vision
 
