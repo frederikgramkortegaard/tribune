@@ -105,23 +105,18 @@ def run_server():
         print_colored(f"Error running server: {e}", Colors.ERROR)
         return None, None
 
-def run_client(client_id, port, private_key, public_key):
+def run_client(client_id, port):
     """Run a Tribune client"""
     client_name = f"CLIENT-{client_id:02d}"
     
     print_colored(f"Starting {client_name} on port {port}", Colors.CLIENT + Colors.BOLD)
-    print_colored(f"Private Key: {private_key}", Colors.CLIENT, f"[{client_name}] ")
-    print_colored(f"Public Key: {public_key}", Colors.CLIENT, f"[{client_name}] ")
+    print_colored(f"Will generate real Ed25519 keypair", Colors.CLIENT, f"[{client_name}] ")
     
     try:
-        # Call client_app with: port, private_key, public_key, server_host, server_port
+        # Call client_app with just port - it will generate real Ed25519 keys
         cmd = [
             './build/client_app',
-            str(port),           # listen port
-            private_key,         # private key
-            public_key,          # public key  
-            SERVER_HOST,         # server host
-            str(SERVER_PORT)     # server port
+            str(port)           # listen port - no keys provided, will auto-generate
         ]
         
         client_process = subprocess.Popen(
@@ -159,15 +154,6 @@ def main():
     processes = []
     
     try:
-        # Generate keypairs for all clients
-        print_colored("Generating Ed25519 keypairs for clients...", Colors.WARNING)
-        client_keys = []
-        for i in range(NUM_CLIENTS):
-            private_key, public_key = generate_ed25519_keypair()
-            client_keys.append((private_key, public_key))
-            print_colored(f"Client {i+1:2d}: {public_key}", Colors.WARNING)
-        print()
-        
         # Start server
         print_colored("Starting server...", Colors.WARNING)
         server_process, server_thread = run_server()
@@ -178,14 +164,13 @@ def main():
             return 1
         
         # Start clients
-        print_colored(f"Starting {NUM_CLIENTS} clients...", Colors.WARNING)
+        print_colored(f"Starting {NUM_CLIENTS} clients with real Ed25519 keys...", Colors.WARNING)
         print()
         
         for i in range(NUM_CLIENTS):
             client_port = BASE_CLIENT_PORT + i
-            private_key, public_key = client_keys[i]
             
-            client_process, output_thread = run_client(i+1, client_port, private_key, public_key)
+            client_process, output_thread = run_client(i+1, client_port)
             if client_process:
                 processes.append(client_process)
                 time.sleep(0.5)  # Stagger client starts

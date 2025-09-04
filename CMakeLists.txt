@@ -25,6 +25,20 @@ FetchContent_Declare(
   GIT_TAG        v3.11.3
 )
 
+# Find libsodium (homebrew installation on macOS)
+find_path(SODIUM_INCLUDE_DIR sodium.h 
+    PATHS /opt/homebrew/include /usr/local/include
+    PATH_SUFFIXES sodium)
+find_library(SODIUM_LIBRARY 
+    NAMES sodium libsodium
+    PATHS /opt/homebrew/lib /usr/local/lib)
+
+if(SODIUM_INCLUDE_DIR AND SODIUM_LIBRARY)
+    message(STATUS "Found libsodium: ${SODIUM_LIBRARY}")
+else()
+    message(FATAL_ERROR "libsodium not found")
+endif()
+
 FetchContent_MakeAvailable(httplib nlohmann_json)
 
 # Include directories
@@ -32,8 +46,9 @@ include_directories(include)
 
 # Example applications
 add_executable(server_app apps/example/server_app.cpp src/server/tribune_server.cpp src/server/client_state.cpp src/protocol/parser.cpp src/mpc/sum_computation.cpp src/crypto/signature.cpp)
-target_link_libraries(server_app PRIVATE httplib::httplib nlohmann_json::nlohmann_json)
+target_include_directories(server_app PRIVATE ${SODIUM_INCLUDE_DIR})
+target_link_libraries(server_app PRIVATE httplib::httplib nlohmann_json::nlohmann_json ${SODIUM_LIBRARY})
 
 add_executable(client_app apps/example/client_app.cpp src/client/tribune_client.cpp apps/example/src/data_collection_module.cpp src/protocol/parser.cpp src/mpc/sum_computation.cpp src/crypto/signature.cpp)
-target_link_libraries(client_app PRIVATE httplib::httplib nlohmann_json::nlohmann_json)
-target_include_directories(client_app PRIVATE apps/example)
+target_include_directories(client_app PRIVATE apps/example ${SODIUM_INCLUDE_DIR})
+target_link_libraries(client_app PRIVATE httplib::httplib nlohmann_json::nlohmann_json ${SODIUM_LIBRARY})

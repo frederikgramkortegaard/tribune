@@ -8,9 +8,13 @@
 #include <vector>
 
 TribuneServer::TribuneServer(const std::string &host, int port, const ServerConfig& config)
-    : config_(config), host(host), port(port), rng_(rd_()),
-      server_private_key_("server_private_key_placeholder"),
-      server_public_key_("server_public_key_placeholder") {
+    : config_(config), host(host), port(port), rng_(rd_()) {
+  // Generate real Ed25519 keypair for server
+  auto keypair = SignatureUtils::generateKeyPair();
+  server_public_key_ = keypair.first;
+  server_private_key_ = keypair.second;
+  
+  LOG("Server initialized with Ed25519 public key: " << server_public_key_);
   setupRoutes();
 }
 
