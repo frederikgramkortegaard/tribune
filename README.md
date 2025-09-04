@@ -26,11 +26,6 @@ The `apps/example/` directory has specific applications that use the library:
 - `client_app` - Simple client that connects and listens for events
 - `MockDataCollectionModule` - Example data collection implementation for testing
 
-## Product Vision
-
-Regular p2p system, but event-driven. Server publishes computation specs (could be SQL table structures or ML model definitions), clients subscribe with their endpoints, then we get this publisher-consumer MPC system where data stays distributed.
-
-Future: integrate blockchain payments for computation contributions.
 
 ## Quick Start
 
@@ -46,25 +41,15 @@ make
 make all
 ```
 
-### Debug Build with Logging
-
-Tribune includes a comprehensive logging system that can be enabled for debugging:
+### Build with/without Logging
 
 ```bash
-# Build in Debug mode to enable logging
+# Debug build with logging
 mkdir build && cd build
 cmake -DCMAKE_BUILD_TYPE=Debug ..
 make
 
-# Run with debug output
-./server_app
-./client_app 9001 private_key_1 public_key_1
-```
-
-**Release Build** (default): Optimized for performance with minimal logging.
-
-```bash
-# Release build (default) - minimal logging
+# Release build (default) - no logging
 cmake -DCMAKE_BUILD_TYPE=Release ..
 make
 ```
