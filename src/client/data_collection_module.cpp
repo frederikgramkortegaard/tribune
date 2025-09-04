@@ -1,4 +1,5 @@
 #include "client/data_collection_module.hpp"
+#include "utils/logging.hpp"
 #include <random>
 #include <sstream>
 #include <iostream>
@@ -22,7 +23,7 @@ std::string MockDataCollectionModule::collectData(const Event& event) {
                 std::chrono::system_clock::now().time_since_epoch()).count();
         ss << "}";
         
-        std::cout << "Client " << client_id_ << " generated predictable value: " << predictable_value << std::endl;
+        DEBUG_DEBUG("Client " << client_id_ << " generated predictable value: " << predictable_value);
         
         return ss.str();
     }

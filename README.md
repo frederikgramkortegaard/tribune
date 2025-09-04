@@ -48,6 +48,36 @@ make all
 make demo
 ```
 
+### Debug Build with Logging
+
+Tribune includes a comprehensive logging system that can be enabled for debugging:
+
+```bash
+# Build in Debug mode to enable logging
+mkdir build && cd build
+cmake -DCMAKE_BUILD_TYPE=Debug ..
+make
+
+# Run with debug output
+./server_app
+./client_app 9001 private_key_1 public_key_1
+```
+
+**Debug Build Features:**
+- `DEBUG_INFO`: General information about operations
+- `DEBUG_DEBUG`: Detailed tracing of computation steps, event processing
+- `DEBUG_WARN`: Warnings about parsing errors or invalid data  
+- `DEBUG_ERROR`: Error conditions that don't cause termination
+- `LOG`: Always-on messages (works in both debug and release builds)
+
+**Release Build** (default): All debug macros become no-ops for optimal performance.
+
+```bash
+# Release build (default) - minimal logging
+cmake -DCMAKE_BUILD_TYPE=Release ..
+make
+```
+
 ### Simple Server Example
 
 ```cpp

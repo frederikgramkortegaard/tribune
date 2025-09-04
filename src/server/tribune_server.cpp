@@ -1,6 +1,7 @@
 #include "protocol/parser.hpp"
 #include "server/tribune_server.hpp"
 #include "crypto/signature.hpp"
+#include "utils/logging.hpp"
 #include <format>
 #include <iostream>
 #include <thread>
@@ -17,8 +18,8 @@ TribuneServer::~TribuneServer() {
   stop();
 }
 void TribuneServer::start() {
-  std::cout << "Starting aggregator server on http://" << host << ":" << port
-            << std::endl;
+  LOG("Starting aggregator server on http://" << host << ":" << port
+           );
   
   // Start periodic event checker thread
   should_stop_ = false;
@@ -42,19 +43,19 @@ void TribuneServer::setupRoutes() {
   });
   svr.Post("/connect",
            [this](const httplib::Request &req, httplib::Response &res) {
-             std::cout << "CONNECT: Received data: " << req.body << std::endl;
+             DEBUG_INFO("CONNECT: Received data: " << req.body);
              this->handleEndpointConnect(req, res);
            });
 
   svr.Post("/submit",
            [this](const httplib::Request &req, httplib::Response &res) {
-             std::cout << "SUBMIT: Received data: " << req.body << std::endl;
+             DEBUG_INFO("SUBMIT: Received data: " << req.body);
              this->handleEndpointSubmit(req, res);
            });
 
   svr.Get("/peers",
           [this](const httplib::Request &req, httplib::Response &res) {
-            std::cout << "PEERS: Received request: " << req.body << std::endl;
+            DEBUG_DEBUG("PEERS: Received request: " << req.body);
             this->handleEndpointPeers(req, res);
           });
 }
@@ -86,20 +87,20 @@ void TribuneServer::handleEndpointConnect(const httplib::Request &req,
 
   if (auto result = parseConnectResponse(req.body)) {
     ConnectResponse parsed_res = *result;
-    std::cout << "Succesfully parsed ConnectResponse from Client with ID: "
-              << parsed_res.client_id << std::endl;
+    DEBUG_DEBUG("Succesfully parsed ConnectResponse from Client with ID: "
+              << parsed_res.client_id);
 
     ClientState state(parsed_res.client_host, parsed_res.client_port,
                       parsed_res.client_id, parsed_res.ed25519_pub);
 
-    std::cout << "Adding client to roster with ID: '" << parsed_res.client_id
-              << "'" << std::endl;
+    DEBUG_INFO("Adding client to roster with ID: '" << parsed_res.client_id
+              << "'");
     
     {
       std::lock_guard<std::mutex> lock(roster_mutex_);
       this->roster[parsed_res.client_id] = state;
-      std::cout << "Roster size after adding: " << this->roster.size()
-                << std::endl;
+      DEBUG_DEBUG("Roster size after adding: " << this->roster.size()
+               );
     }
 
     res.status = 200;
@@ -118,10 +119,10 @@ void TribuneServer::handleEndpointSubmit(const httplib::Request &req,
 
   if (auto result = parseSubmitResponse(req.body)) {
     EventResponse parsed_res = *result;
-    std::cout << "=== COMPUTATION RESULT RECEIVED ===" << std::endl;
-    std::cout << "From Client: " << parsed_res.client_id << std::endl;
-    std::cout << "Event ID: " << parsed_res.event_id << std::endl;
-    std::cout << "Result: " << parsed_res.data << std::endl;
+    DEBUG_DEBUG("=== COMPUTATION RESULT RECEIVED ===");
+    DEBUG_DEBUG("From Client: " << parsed_res.client_id);
+    DEBUG_DEBUG("Event ID: " << parsed_res.event_id);
+    DEBUG_DEBUG("Result: " << parsed_res.data);
     
     // Show progress: received X/Y sub results
     int received_count = 0;
@@ -144,18 +145,18 @@ void TribuneServer::handleEndpointSubmit(const httplib::Request &req,
     }
     
     if (expected_count > 0) {
-      std::cout << "Progress: received " << received_count << "/" << expected_count << " sub results" << std::endl;
+      DEBUG_DEBUG("Progress: received " << received_count << "/" << expected_count << " sub results");
     }
-    std::cout << "====================================" << std::endl;
+    DEBUG_DEBUG("====================================");
 
-    std::cout << "Checking if client '" << parsed_res.client_id
-              << "' is in roster..." << std::endl;
+    DEBUG_DEBUG("Checking if client '" << parsed_res.client_id
+              << "' is in roster...");
     
     {
       std::lock_guard<std::mutex> roster_lock(roster_mutex_);
-      std::cout << "Current roster contents:" << std::endl;
+      DEBUG_DEBUG("Current roster contents:");
       for (const auto &[id, _] : this->roster) {
-        std::cout << "  - '" << id << "'" << std::endl;
+        DEBUG_DEBUG("  - '" << id << "'");
       }
 
       if (this->roster.find(parsed_res.client_id) != this->roster.end()) {
@@ -173,10 +174,8 @@ void TribuneServer::handleEndpointSubmit(const httplib::Request &req,
         res.status = 200;
         res.set_content("{\"received\":true}", "application/json");
       } else {
-        std::cout
-            << "Received valid SubmitResponse from Unconnected Client with ID: "
-            << parsed_res.client_id << ", for Event: " << parsed_res.event_id
-            << std::endl;
+        DEBUG_WARN("Received valid SubmitResponse from Unconnected Client with ID: "
+            << parsed_res.client_id << ", for Event: " << parsed_res.event_id);
         res.status = 400;
         res.set_content("{\"error\":\"Client not connected\"}",
                         "application/json");
@@ -185,7 +184,7 @@ void TribuneServer::handleEndpointSubmit(const httplib::Request &req,
 
   } else {
     res.status = 400;
-    std::cout << "Received invalid SubmitResponse" << std::endl;
+    DEBUG_DEBUG("Received invalid SubmitResponse");
     res.set_content("{\"error\":\"Invalid request\"}", "application/json");
   }
 }
@@ -193,22 +192,22 @@ void TribuneServer::handleEndpointSubmit(const httplib::Request &req,
 void TribuneServer::announceEvent(const Event& event, std::string* result) {
   // VALIDATE event before announcing to catch signature/timestamp issues
   if (event.server_signature.empty()) {
-    std::cout << "ERROR: Event " << event.event_id << " has empty server signature!" << std::endl;
+    DEBUG_ERROR("ERROR: Event " << event.event_id << " has empty server signature!");
   }
   if (event.timestamp.time_since_epoch().count() == 0) {
-    std::cout << "ERROR: Event " << event.event_id << " has zero timestamp!" << std::endl;
+    DEBUG_ERROR("ERROR: Event " << event.event_id << " has zero timestamp!");
   }
   
   // Convert Event to JSON string using automatic conversion
   nlohmann::json j = event;
   std::string json_str = j.dump();
 
-  std::cout << "Announcing event " << event.event_id << " to " 
-            << event.participants.size() << " participants" << std::endl;
-  std::cout << "Event signature: " << event.server_signature << std::endl;
-  std::cout << "JSON being sent: " << json_str.substr(0, 200) << "..." << std::endl;
-  std::cout << "Event timestamp: " << std::chrono::duration_cast<std::chrono::milliseconds>(
-                event.timestamp.time_since_epoch()).count() << "ms" << std::endl;
+  DEBUG_DEBUG("Announcing event " << event.event_id << " to " 
+            << event.participants.size() << " participants");
+  DEBUG_DEBUG("Event signature: " << event.server_signature);
+  DEBUG_DEBUG("JSON being sent: " << json_str.substr(0, 200) << "...");
+  DEBUG_DEBUG("Event timestamp: " << std::chrono::duration_cast<std::chrono::milliseconds>(
+                event.timestamp.time_since_epoch()).count() << "ms");
   
   // Track this event as active
   {
@@ -236,20 +235,17 @@ void TribuneServer::announceEvent(const Event& event, std::string* result) {
         auto res = cli.Post("/event", json_str, "application/json");
 
         if (res && res->status == 200) {
-          std::cout << "Sent Event with ID: " << event_id
+          DEBUG_DEBUG("Sent Event with ID: " << event_id
                     << ", to Client: " << participant.client_host << ":"
-                    << participant.client_port << " - Status: " << res->status << std::endl;
+                    << participant.client_port << " - Status: " << res->status);
         } else {
-          std::cout << "Failed to send Event to Client: " << participant.client_host 
-                    << ":" << participant.client_port;
-          if (res) {
-            std::cout << " (Status: " << res->status << ")";
-          }
-          std::cout << std::endl;
+          DEBUG_DEBUG("Failed to send Event to Client: " << participant.client_host 
+                    << ":" << participant.client_port 
+                    << (res ? " (Status: " + std::to_string(res->status) + ")" : ""));
         }
       } catch (const std::exception& e) {
-        std::cout << "Exception sending event to " << participant.client_host 
-                  << ":" << participant.client_port << ": " << e.what() << std::endl;
+        DEBUG_ERROR("Exception sending event to " << participant.client_host 
+                  << ":" << participant.client_port << ": " << e.what());
       }
     });
     
@@ -262,7 +258,7 @@ void TribuneServer::announceEvent(const Event& event, std::string* result) {
     thread.join();
   }
   
-  std::cout << "All event announcements completed for event " << event.event_id << std::endl;
+  DEBUG_DEBUG("All event announcements completed for event " << event.event_id);
 }
 
 std::vector<ClientInfo> TribuneServer::selectParticipants() {
@@ -281,12 +277,12 @@ std::vector<ClientInfo> TribuneServer::selectParticipants() {
     }
   }
   
-  std::cout << "Found " << active_clients.size() << " active clients" << std::endl;
+  DEBUG_DEBUG("Found " << active_clients.size() << " active clients");
   
   // Check minimum threshold
   if (static_cast<int>(active_clients.size()) < config_.min_participants) {
-    std::cout << "Not enough participants (" << active_clients.size() 
-              << " < " << config_.min_participants << ")" << std::endl;
+    DEBUG_DEBUG("Not enough participants (" << active_clients.size() 
+              << " < " << config_.min_participants << ")");
     return {};
   }
   
@@ -307,7 +303,7 @@ std::vector<ClientInfo> TribuneServer::selectParticipants() {
     active_clients.begin() + participant_count
   );
   
-  std::cout << "Selected " << selected.size() << " participants" << std::endl;
+  DEBUG_DEBUG("Selected " << selected.size() << " participants");
   return selected;
 }
 
@@ -327,9 +323,9 @@ std::optional<Event> TribuneServer::createEvent(EventType type, const std::strin
   
   // Create server signature for event verification  
   std::string event_hash = event.event_id + "|" + event.computation_type + "|" + std::to_string(event.participants.size());
-  std::cout << "SERVER: Creating signature for event hash: " << event_hash << std::endl;
+  DEBUG_DEBUG("SERVER: Creating signature for event hash: " << event_hash);
   event.server_signature = SignatureUtils::createSignature(event_hash, server_private_key_);
-  std::cout << "SERVER: Generated signature: " << event.server_signature << std::endl;
+  DEBUG_DEBUG("SERVER: Generated signature: " << event.server_signature);
   
   return event;
 }
@@ -337,7 +333,7 @@ std::optional<Event> TribuneServer::createEvent(EventType type, const std::strin
 void TribuneServer::registerComputation(const std::string& type, std::unique_ptr<MPCComputation> computation) {
   std::lock_guard<std::mutex> lock(computations_mutex_);
   computations_[type] = std::move(computation);
-  std::cout << "Server registered MPC computation: " << type << std::endl;
+  DEBUG_INFO("Server registered MPC computation: " << type);
 }
 
 void TribuneServer::checkForCompleteResults() {
@@ -363,8 +359,8 @@ void TribuneServer::checkForCompleteResults() {
     
     // Check if we have all expected responses
     if (received_count >= active_event.expected_participants) {
-      std::cout << "Event " << event_id << " is complete (" << received_count 
-                << "/" << active_event.expected_participants << " responses)" << std::endl;
+      DEBUG_DEBUG("Event " << event_id << " is complete (" << received_count 
+                << "/" << active_event.expected_participants << " responses)");
       
       // Process the complete results
       std::lock_guard<std::mutex> comp_lock(computations_mutex_);
@@ -372,18 +368,18 @@ void TribuneServer::checkForCompleteResults() {
       
       if (comp_it != computations_.end()) {
         std::string final_result = comp_it->second->aggregateResults(results);
-        std::cout << "=== FINAL MPC RESULT ===" << std::endl;
-        std::cout << "Event: " << event_id << std::endl;
-        std::cout << "Computation: " << active_event.computation_type << std::endl;
-        std::cout << "Final Result: " << final_result << std::endl;
-        std::cout << "========================" << std::endl;
+        DEBUG_DEBUG("=== FINAL MPC RESULT ===");
+        DEBUG_DEBUG("Event: " << event_id);
+        DEBUG_DEBUG("Computation: " << active_event.computation_type);
+        DEBUG_DEBUG("Final Result: " << final_result);
+        DEBUG_DEBUG("========================");
         
         // Store result in provided pointer if available
         if (active_event.result_ptr != nullptr) {
           *active_event.result_ptr = final_result;
         }
       } else {
-        std::cout << "No computation handler for type: " << active_event.computation_type << std::endl;
+        DEBUG_DEBUG("No computation handler for type: " << active_event.computation_type);
       }
       
       completed_events.push_back(event_id);
@@ -398,7 +394,7 @@ void TribuneServer::checkForCompleteResults() {
 }
 
 void TribuneServer::periodicEventChecker() {
-  std::cout << "Started periodic event checker thread" << std::endl;
+  DEBUG_INFO("Started periodic event checker thread");
   
   while (!should_stop_) {
     // Sleep for 5 seconds between checks
@@ -423,9 +419,9 @@ void TribuneServer::periodicEventChecker() {
                                ? static_cast<int>(responses_it->second.size()) 
                                : 0;
           
-          std::cout << "Event " << event_id << " timed out after " << age.count() 
+          DEBUG_WARN("Event timed out after " << age.count() 
                     << " seconds with " << received_count << "/" << active_event.expected_participants 
-                    << " responses" << std::endl;
+                    << " responses");
           
           timed_out_events.push_back(event_id);
         }
@@ -445,11 +441,11 @@ void TribuneServer::periodicEventChecker() {
     {
       std::lock_guard<std::mutex> lock(active_events_mutex_);
       if (!active_events_.empty()) {
-        std::cout << "Active events: " << active_events_.size() << std::endl;
+        DEBUG_DEBUG("Active events: " << active_events_.size());
       }
     }
   }
   
-  std::cout << "Periodic event checker thread stopped" << std::endl;
+  DEBUG_INFO("Periodic event checker thread stopped");
 }
 

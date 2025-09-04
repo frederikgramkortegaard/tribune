@@ -1,6 +1,7 @@
 
 
 #include "events/events.hpp"
+#include "utils/logging.hpp"
 #include <httplib.h>
 #include <iostream>
 #include <nlohmann/json.hpp>
@@ -8,13 +9,13 @@
 
 std::optional<EventResponse> parseSubmitResponse(const std::string &body) {
   try {
-    std::cout << "Parsing SubmitResponse" << std::endl;
+    DEBUG_DEBUG("Parsing SubmitResponse");
     nlohmann::json j = nlohmann::json::parse(body);
     
     // Validate Required Fields
     if (!j.contains("event_id") || !j.contains("data") ||
         !j.contains("timestamp") || !j.contains("client_id")) {
-      std::cout << "Missing required fields in submit request" << std::endl;
+      DEBUG_DEBUG("Missing required fields in submit request");
       return std::nullopt;
     }
     
@@ -27,19 +28,19 @@ std::optional<EventResponse> parseSubmitResponse(const std::string &body) {
     return j.get<EventResponse>();
     
   } catch (const nlohmann::json::exception& e) {
-    std::cout << "JSON parsing error: " << e.what() << std::endl;
+    DEBUG_ERROR("JSON parsing error: " << e.what());
     return std::nullopt;
   }
 }
 std::optional<ConnectResponse> parseConnectResponse(const std::string &body) {
   try {
-    std::cout << "Parsing ConnectResponse" << std::endl;
+    DEBUG_DEBUG("Parsing ConnectResponse");
     nlohmann::json j = nlohmann::json::parse(body);
     
     // Validate required fields
     if (!j.contains("client_host") || !j.contains("client_port") || 
         !j.contains("client_id") || !j.contains("ed25519_pub")) {
-      std::cout << "Missing required fields in connect request" << std::endl;
+      DEBUG_DEBUG("Missing required fields in connect request");
       return std::nullopt;
     }
     
@@ -52,7 +53,7 @@ std::optional<ConnectResponse> parseConnectResponse(const std::string &body) {
     return j.get<ConnectResponse>();
     
   } catch (const nlohmann::json::exception& e) {
-    std::cout << "JSON parsing error: " << e.what() << std::endl;
+    DEBUG_ERROR("JSON parsing error: " << e.what());
     return std::nullopt;
   }
 }

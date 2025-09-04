@@ -112,7 +112,7 @@ bool TribuneClient::connectToSeed() {
       return true;
     } else {
       DEBUG_ERROR("Failed to connect to seed node. Status: "
-                  << (res ? std::to_string(res->status) : "No response"));
+                << (res ? std::to_string(res->status) : "No response"));
       if (res) {
         DEBUG_DEBUG("Response body: " << res->body);
       }
@@ -135,9 +135,8 @@ void TribuneClient::setupEventRoutes() {
           // Parse the event
           nlohmann::json j = nlohmann::json::parse(req.body);
           Event event = j.get<Event>();
-
-          DEBUG_DEBUG("Received event from server with signature: '"
-                      << event.server_signature << "'");
+          
+          DEBUG_DEBUG("Received event from server with signature: '" << event.server_signature << "'");
 
           // Handle the event
           onEventAnnouncement(event);
@@ -162,18 +161,14 @@ void TribuneClient::setupEventRoutes() {
       // Parse the peer data message
       nlohmann::json j = nlohmann::json::parse(req.body);
       PeerDataMessage peer_msg = j.get<PeerDataMessage>();
-
+      
       DEBUG_DEBUG("Received peer message with event_id: " << peer_msg.event_id);
-      DEBUG_DEBUG(
-          "Received original event ID: " << peer_msg.original_event.event_id);
-      DEBUG_DEBUG(
-          "JSON contains original_event: " << j.contains("original_event"));
+      DEBUG_DEBUG("Received original event ID: " << peer_msg.original_event.event_id);
+      DEBUG_DEBUG("JSON contains original_event: " << j.contains("original_event"));
       if (j.contains("original_event")) {
-        DEBUG_DEBUG("original_event JSON has server_signature: "
-                    << j["original_event"].contains("server_signature"));
+        DEBUG_DEBUG("original_event JSON has server_signature: " << j["original_event"].contains("server_signature"));
         if (j["original_event"].contains("server_signature")) {
-          DEBUG_DEBUG("server_signature value: '"
-                      << j["original_event"]["server_signature"] << "'");
+          DEBUG_DEBUG("server_signature value: '" << j["original_event"]["server_signature"] << "'");
         }
       }
 
@@ -239,12 +234,16 @@ void TribuneClient::onEventAnnouncement(const Event &event, bool relay) {
       std::string shard_value =
           std::to_string(data_json["value"].get<double>());
       event_shards_[event.event_id][client_id_] = shard_value;
-      DEBUG_DEBUG("Stored our own shard for event "
-                  << event.event_id << " (value: " << shard_value << ")");
+      DEBUG_DEBUG("Stored our own shard for event " << event.event_id
+                << " (value: " << shard_value << ")");
     } catch (const std::exception &e) {
       DEBUG_ERROR("Error parsing own data JSON: " << e.what());
     }
   }
+
+  // Add a small delay to ensure all participants receive the event announcement
+  // before peer data sharing begins (prevents race conditions)
+  std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
   if (relay) {
     shareDataWithPeers(event, my_data);
@@ -272,11 +271,11 @@ void TribuneClient::onPeerDataReceived(const PeerDataMessage &peer_msg) {
                            .count();
 
     DEBUG_DEBUG("Event timestamp: " << event_time_ms
-                                    << "ms, Now: " << now_time_ms << "ms");
+              << "ms, Now: " << now_time_ms << "ms" << std::endl;
 
     if (event_time_ms == 0) {
       DEBUG_DEBUG("WARNING: Event " << peer_msg.original_event.event_id
-                                    << " has zero timestamp!");
+                << " has zero timestamp!" << std::endl;
     }
 
     event_age = std::chrono::duration_cast<std::chrono::seconds>(
@@ -285,7 +284,8 @@ void TribuneClient::onPeerDataReceived(const PeerDataMessage &peer_msg) {
 
     DEBUG_DEBUG("Event age: " << event_age << "s");
     if (event_age > EVENT_TIMEOUT_SECONDS) {
-      DEBUG_DEBUG("Rejecting very old peer event (age: " << event_age << "s)");
+      DEBUG_DEBUG("Rejecting very old peer event (age: " << event_age << "s)"
+                << std::endl;
       return;
     }
   }
@@ -315,8 +315,8 @@ void TribuneClient::onPeerDataReceived(const PeerDataMessage &peer_msg) {
   }
 
   if (!have_event && !peer_msg.original_event.event_id.empty()) {
-    DEBUG_DEBUG("Don't know about event "
-                << peer_msg.event_id << ", processing peer-propagated event");
+    DEBUG_DEBUG("Don't know about event " << peer_msg.event_id
+              << ", processing peer-propagated event" << std::endl;
 
     // Age already validated in early check above
 
@@ -326,7 +326,8 @@ void TribuneClient::onPeerDataReceived(const PeerDataMessage &peer_msg) {
       onEventAnnouncement(peer_msg.original_event, false);
       have_event = true; // Update flag since we now have the event
     } else {
-      DEBUG_DEBUG("Invalid server signature on peer event, rejecting");
+      DEBUG_DEBUG("Invalid server signature on peer event, rejecting"
+                << std::endl;
       return;
     }
   }
@@ -335,14 +336,15 @@ void TribuneClient::onPeerDataReceived(const PeerDataMessage &peer_msg) {
   // point)
   if (!have_event) {
     DEBUG_DEBUG("Still don't know about event " << peer_msg.event_id
-                                                << " after peer propagation");
+              << " after peer propagation" << std::endl;
     return;
   }
 
   std::lock_guard<std::mutex> active_lock(active_events_mutex_);
   auto event_it = active_events_.find(peer_msg.event_id);
   if (event_it == active_events_.end()) {
-    DEBUG_DEBUG("Event " << peer_msg.event_id << " not found in active events");
+    DEBUG_DEBUG("Event " << peer_msg.event_id << " not found in active events"
+              << std::endl;
     return;
   }
 
@@ -351,10 +353,8 @@ void TribuneClient::onPeerDataReceived(const PeerDataMessage &peer_msg) {
   std::string sender_public_key;
 
   DEBUG_DEBUG("Checking authorization for client " << peer_msg.from_client);
-  DEBUG_DEBUG("Event " << peer_msg.event_id << " has "
-                       << event_it->second.participants.size()
-                       << " participants:");
-
+  DEBUG_DEBUG("Event " << peer_msg.event_id << " has " << event_it->second.participants.size() << " participants:");
+  
   for (const auto &participant : event_it->second.participants) {
     DEBUG_DEBUG("- " << participant.client_id);
     if (participant.client_id == peer_msg.from_client) {
@@ -365,8 +365,8 @@ void TribuneClient::onPeerDataReceived(const PeerDataMessage &peer_msg) {
   }
 
   if (!valid_participant) {
-    DEBUG_DEBUG(
-        "Rejected shard from unauthorized client: " << peer_msg.from_client);
+    DEBUG_DEBUG("Rejected shard from unauthorized client: "
+              << peer_msg.from_client << std::endl;
     DEBUG_DEBUG("Client not found in participant list!");
     return;
   } else {
@@ -380,8 +380,8 @@ void TribuneClient::onPeerDataReceived(const PeerDataMessage &peer_msg) {
       message, peer_msg.signature, sender_public_key);
 
   if (!signature_valid) {
-    DEBUG_DEBUG(
-        "Rejected shard with invalid signature from: " << peer_msg.from_client);
+    DEBUG_DEBUG("Rejected shard with invalid signature from: "
+              << peer_msg.from_client << std::endl;
     return;
   }
 
@@ -394,8 +394,8 @@ void TribuneClient::onPeerDataReceived(const PeerDataMessage &peer_msg) {
       std::string shard_value =
           std::to_string(data_json["value"].get<double>());
       event_shards_[peer_msg.event_id][peer_msg.from_client] = shard_value;
-      DEBUG_DEBUG("Stored valid shard from "
-                  << peer_msg.from_client << " (value: " << shard_value << ")");
+      DEBUG_DEBUG("Stored valid shard from " << peer_msg.from_client
+                << " (value: " << shard_value << ")" << std::endl;
     } catch (const std::exception &e) {
       DEBUG_DEBUG("Error parsing peer data JSON: " << e.what());
       return;
@@ -407,7 +407,7 @@ void TribuneClient::onPeerDataReceived(const PeerDataMessage &peer_msg) {
   // Start computation if we have all shards
   if (all_shards_received) {
     DEBUG_DEBUG("All shards received for event " << peer_msg.event_id
-                                                 << ", starting computation");
+              << ", starting computation" << std::endl;
     std::thread([this, event_id = peer_msg.event_id]() {
       computeAndSubmitResult(event_id);
     }).detach();
@@ -422,7 +422,8 @@ void TribuneClient::onPeerDataReceived(const PeerDataMessage &peer_msg) {
 
 void TribuneClient::shareDataWithPeers(const Event &event,
                                        const std::string &my_data) {
-  DEBUG_INFO("Sharing data with peers for event: " << event.event_id);
+  DEBUG_INFO("Sharing data with peers for event: " << event.event_id
+            << std::endl;
 
   for (const auto &peer : event.participants) {
     // Skip ourselves
@@ -431,8 +432,7 @@ void TribuneClient::shareDataWithPeers(const Event &event,
     }
 
     DEBUG_DEBUG("Sending data to peer: " << peer.client_id << " at "
-                                         << peer.client_host << ":"
-                                         << peer.client_port);
+              << peer.client_host << ":" << peer.client_port << std::endl;
 
     // Split data into len(event.participants) - 1 shards
 
@@ -445,9 +445,8 @@ void TribuneClient::shareDataWithPeers(const Event &event,
       peer_msg.from_client = client_id_;
       peer_msg.data = my_data;
       peer_msg.timestamp = std::chrono::system_clock::now();
-      peer_msg.original_event =
-          event; // Include server-signed event for propagation
-
+      peer_msg.original_event = event; // Include server-signed event for propagation
+      
       DEBUG_DEBUG("Creating peer message with event_id: " << peer_msg.event_id);
       DEBUG_DEBUG("Original event ID: " << peer_msg.original_event.event_id);
 
@@ -462,14 +461,16 @@ void TribuneClient::shareDataWithPeers(const Event &event,
       auto res = cli.Post("/peer-data", payload.dump(), "application/json");
 
       if (res && res->status == 200) {
-        DEBUG_DEBUG("Successfully shared data with " << peer.client_id);
+        DEBUG_DEBUG("Successfully shared data with " << peer.client_id
+                  << std::endl;
       } else {
-        DEBUG_WARN("Failed to share data with " << peer.client_id);
+        DEBUG_WARN("Failed to share data with " << peer.client_id
+                  << std::endl;
       }
 
     } catch (const std::exception &e) {
       DEBUG_ERROR("Exception sharing data with " << peer.client_id << ": "
-                                                 << e.what());
+                << e.what() << std::endl;
     }
   }
 }
@@ -500,7 +501,8 @@ bool TribuneClient::hasAllShards(const std::string &event_id) {
 }
 
 void TribuneClient::computeAndSubmitResult(const std::string &event_id) {
-  LOG("=== COMPUTING RESULT FOR EVENT: " << event_id << " ===");
+  LOG("=== COMPUTING RESULT FOR EVENT: " << event_id
+            << " ===" << std::endl;
 
   Event event;
   std::vector<std::string> shards;
@@ -515,7 +517,8 @@ void TribuneClient::computeAndSubmitResult(const std::string &event_id) {
     auto shards_it = event_shards_.find(event_id);
 
     if (event_it == active_events_.end() || shards_it == event_shards_.end()) {
-      DEBUG_ERROR("Error: Event or shards not found for " << event_id);
+      DEBUG_ERROR("Error: Event or shards not found for " << event_id
+                << std::endl;
       return;
     }
 
@@ -538,8 +541,8 @@ void TribuneClient::computeAndSubmitResult(const std::string &event_id) {
     auto comp_it = computations_.find(computation_type);
 
     if (comp_it == computations_.end()) {
-      DEBUG_ERROR(
-          "Error: No computation registered for type: " << computation_type);
+      DEBUG_ERROR("Error: No computation registered for type: "
+                << computation_type << std::endl;
       return;
     }
 
@@ -571,14 +574,16 @@ void TribuneClient::computeAndSubmitResult(const std::string &event_id) {
       DEBUG_DEBUG("Server response: " << res->body);
     } else {
       DEBUG_ERROR("Failed to send result to server. Status: "
-                  << (res ? std::to_string(res->status) : "No response"));
+                << (res ? std::to_string(res->status) : "No response")
+                << std::endl;
       if (res) {
         DEBUG_DEBUG("Response body: " << res->body);
       }
     }
 
   } catch (const std::exception &e) {
-    DEBUG_ERROR("Exception sending result to server: " << e.what());
+    DEBUG_ERROR("Exception sending result to server: " << e.what()
+              << std::endl;
   }
 }
 
@@ -634,9 +639,11 @@ bool TribuneClient::verifyEventFromServer(const Event &event) {
   DEBUG_DEBUG("CLIENT: Verifying event signature");
   DEBUG_DEBUG("CLIENT: Event hash: " << event_hash);
   DEBUG_DEBUG("CLIENT: Event server_signature: '" << event.server_signature
-                                                  << "'");
+            << "'" << std::endl;
 
   // Verify with server's public key
   return SignatureUtils::verifySignature(event_hash, event.server_signature,
                                          server_public_key_);
 }
+
+// Orphan shard processing is no longer needed with peer event propagation

@@ -1,4 +1,5 @@
 #include "crypto/signature.hpp"
+#include "utils/logging.hpp"
 #include <iostream>
 
 std::string SignatureUtils::createMessage(const std::string& event_id, const std::string& from_client, const std::string& data) {
@@ -11,7 +12,7 @@ std::string SignatureUtils::createSignature(const std::string& message, const st
     std::hash<std::string> hasher;
     size_t hash = hasher(message + private_key);
     
-    std::cout << "Creating dummy signature for message: " << message.substr(0, 50) << "..." << std::endl;
+    DEBUG_DEBUG("Creating dummy signature for message: " << message.substr(0, 50) << "...");
     return "dummy_sig_" + std::to_string(hash);
 }
 
@@ -20,13 +21,13 @@ bool SignatureUtils::verifySignature(const std::string& message, const std::stri
     // For dummy implementation, just check if signature starts with expected prefix
     // In a real implementation, this would use the public key to verify the signature
     
-    std::cout << "Verifying dummy signature: ";
+    DEBUG_DEBUG("Verifying dummy signature for message: " << message.substr(0, 30) << "...");
     
     if (signature.find("dummy_sig_") == 0) {
-        std::cout << "VALID (dummy signature format)" << std::endl;
+        DEBUG_DEBUG("Signature VALID (dummy signature format)");
         return true;
     } else {
-        std::cout << "INVALID (not dummy signature format)" << std::endl;
+        DEBUG_DEBUG("Signature INVALID (not dummy signature format)");
         return false;
     }
 }

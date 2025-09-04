@@ -1,5 +1,11 @@
 # TODO
 
+IMPORTANT : When sharding data to peers we need to randomly split it, such that not every peer receives an even share
+no_data_module_configured
+
+periodic cleanup counter should be defined in a config  ( in on peerdatareceived, we even have another cleanup method so why is there cleanup here?)
+possibly read locks in hasAllShards() ?
+
 ## MPC Computation Execution
 - [ ] Check if all expected shards received for an event
 - [ ] Execute registered computation when complete
