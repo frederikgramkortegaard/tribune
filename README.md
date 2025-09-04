@@ -92,7 +92,7 @@ int main() {
     
     // Register computation type - this defines what kind of MPC computation
     // the server can coordinate (sum, average, ML training, etc.)
-    // Must match what clients register
+    // only clients who also register this, can respond to "sum" requests
     server.registerComputation("sum", std::make_unique<SumComputation>());
     
     // Start server in background thread to handle client connections
