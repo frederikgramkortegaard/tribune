@@ -37,11 +37,20 @@ int main() {
   std::cout << "DEBUG: About to create and announce single test event..."
             << std::endl;
 
+  std::string result;
   if (auto event = server.createEvent(EventType::DataSubmission, event_id)) {
     std::cout << "Created event: " << event_id << " with "
               << event->participants.size() << " participants" << std::endl;
-    server.announceEvent(*event);
+    server.announceEvent(*event, &result);
     std::cout << "Event announced. Waiting for completion..." << std::endl;
+    
+    // Wait for computation to complete
+    while (result.empty()) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    }
+    
+    std::cout << "=== COMPUTATION COMPLETED ===" << std::endl;
+    std::cout << "Final Result: " << result << std::endl;
   } else {
     std::cout << "Insufficient participants for event " << event_id
               << ", skipping..." << std::endl;

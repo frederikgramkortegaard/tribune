@@ -22,7 +22,7 @@ public:
 
   void start();
   void stop();
-  void announceEvent(const Event& event);
+  void announceEvent(const Event& event, std::string* result = nullptr);
   
   // Event creation with participant selection
   std::optional<Event> createEvent(EventType type, const std::string& event_id, const std::string& computation_type = "sum");
@@ -81,6 +81,7 @@ private:
     std::string computation_type;
     int expected_participants;
     std::chrono::time_point<std::chrono::steady_clock> created_time;
+    std::string* result_ptr = nullptr; // Optional pointer to store final result
   };
   std::unordered_map<std::string, ActiveEvent> active_events_;
   std::mutex active_events_mutex_;

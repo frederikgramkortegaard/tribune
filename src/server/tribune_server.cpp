@@ -190,7 +190,7 @@ void TribuneServer::handleEndpointSubmit(const httplib::Request &req,
   }
 }
 
-void TribuneServer::announceEvent(const Event& event) {
+void TribuneServer::announceEvent(const Event& event, std::string* result) {
   // VALIDATE event before announcing to catch signature/timestamp issues
   if (event.server_signature.empty()) {
     std::cout << "ERROR: Event " << event.event_id << " has empty server signature!" << std::endl;
@@ -218,6 +218,7 @@ void TribuneServer::announceEvent(const Event& event) {
     active_event.computation_type = event.computation_type;
     active_event.expected_participants = static_cast<int>(event.participants.size());
     active_event.created_time = std::chrono::steady_clock::now();
+    active_event.result_ptr = result;
     active_events_[event.event_id] = active_event;
   }
 
@@ -376,6 +377,11 @@ void TribuneServer::checkForCompleteResults() {
         std::cout << "Computation: " << active_event.computation_type << std::endl;
         std::cout << "Final Result: " << final_result << std::endl;
         std::cout << "========================" << std::endl;
+        
+        // Store result in provided pointer if available
+        if (active_event.result_ptr != nullptr) {
+          *active_event.result_ptr = final_result;
+        }
       } else {
         std::cout << "No computation handler for type: " << active_event.computation_type << std::endl;
       }

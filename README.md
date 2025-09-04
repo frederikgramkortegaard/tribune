@@ -48,6 +48,89 @@ make all
 make demo
 ```
 
+### Simple Server Example
+
+```cpp
+#include "server/tribune_server.hpp"
+#include "mpc/sum_computation.hpp"
+
+int main() {
+    // Create server on localhost:8080
+    // The server coordinates MPC computations and manages client rosters
+    TribuneServer server("localhost", 8080);
+    
+    // Register computation type - this defines what kind of MPC computation
+    // the server can coordinate (sum, average, ML training, etc.)
+    // Must match what clients register
+    server.registerComputation("sum", std::make_unique<SumComputation>());
+    
+    // Start server in background thread to handle client connections
+    // and HTTP requests for event announcements
+    std::thread server_thread([&server]() {
+        server.start();
+    });
+    
+    // Wait for clients to connect and register with the server
+    std::this_thread::sleep_for(std::chrono::seconds(10));
+    
+    // Create and announce a computation event
+    // This selects participants and sends event announcements to all selected clients
+    std::string result;
+    if (auto event = server.createEvent(EventType::DataSubmission, "my-event")) {
+        server.announceEvent(*event, &result);
+        
+        // Wait for computation to complete
+        while (result.empty()) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+        
+        std::cout << "MPC Computation Result: " << result << std::endl;
+    }
+    
+    server_thread.join();
+    return 0;
+}
+```
+
+### Simple Client Example
+
+```cpp
+#include "client/tribune_client.hpp"
+#include "mpc/sum_computation.hpp"
+#include "data/simple_data_collection.hpp"
+
+int main() {
+    // Create client connecting to localhost:8080, listening on port 18001
+    TribuneClient client("localhost", 8080, 18001, 
+                        "ed25519_private_key", "ed25519_public_key");
+    
+    // Register computation type, these are MPC compliant
+    // computation modules, of which it's also possible to create your own
+    // this one just computes the sum of the shards across an event
+    client.registerComputation("sum", std::make_unique<SumComputation>());
+
+    
+    // Register data collection module (how client fetches its data)
+    // this could be a custom SQL query interface, an HTTP connection to temperature sensor
+    // or anything similar, it will be polled whenver the client receives an Announcement
+    client.setDataCollectionModule(std::make_unique<SimpleDataCollectionModule>());
+    
+    // Connect to server
+    if (!client.connectToSeed()) {
+        std::cout << "Failed to connect to server" << std::endl;
+        return 1;
+    }
+    
+    // Start listening for events
+    client.startListening();
+    
+    // Keep running to participate in computations
+    std::this_thread::sleep_for(std::chrono::seconds(60));
+    
+    return 0;
+}
+```
+
 ### Manual Testing
 
 ```bash
