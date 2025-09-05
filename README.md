@@ -5,6 +5,15 @@ Tribune is a C++ library for distributed multi-party computation with P2P networ
 
 The system allows multiple parties to collaboratively train ML models, perform secure aggregations, and run distributed computations where no single party ever sees the complete dataset. Applications include federated learning scenarios, collaborative analytics, and any use case requiring computation over distributed private data.
 
+## Federated Learning Demo
+
+This repository includes a **complete federated learning implementation** demonstrating privacy-preserving collaborative model training. Multiple clients train a shared logistic regression model using secure aggregation with pairwise masking - ensuring no client ever sees another's data.
+
+**Quick demo:** `python3 apps/federated-machinelearning/scripts/run_demo.py`  
+*(The script will automatically build the executables if needed - requires CMake and a C++ compiler)*
+
+The implementation shows real-world federated learning with gradient computation, secure aggregation, and distributed training rounds. See [`apps/federated-machinelearning/`](apps/federated-machinelearning/) for details.
+
 :speech_balloon: **Security Model:** This uses a star topology with centralized coordination, which has obvious trust and single-point-of-failure issues. We assume an honest-but-curious adversary model - the server coordinates but doesn't see raw client data. Not suitable for truly adversarial environments where you can't trust the coordinator.
 
 :pushpin: [Development TODO](https://github.com/frederikgramkortegaard/tribune/blob/master/TODO.md)
@@ -20,10 +29,18 @@ The `src/` directory contains the core library for distributed MPC. Public API i
 
 Everything else (protocol parsing, JSON serialization, client state management, crypto utilities, logging) is internal implementation.
 
-The `apps/example/` directory has specific applications that use the library:
+The `apps/` directory contains example applications:
+
+**`apps/example/`** - Basic MPC demonstration:
 - `server_app` - Basic server that creates and announces computation events
 - `client_app` - Simple client that connects and listens for events
 - `MockDataCollectionModule` - Example data collection implementation for testing
+
+**`apps/federated-machinelearning/`** - Privacy-preserving federated learning demo:
+- Demonstrates collaborative training of a logistic regression model
+- Implements secure aggregation with pairwise masking
+- Includes complete working example with multiple clients training a logout prediction model
+- Run with: `python3 apps/federated-machinelearning/scripts/run_demo.py`
 
 
 ## Quick Start

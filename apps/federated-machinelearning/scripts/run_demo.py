@@ -52,14 +52,24 @@ def cleanup_processes():
         pass
 
 def build_executables():
-    """Build the federated learning executables"""
-    print("Building federated learning executables...")
+    """Build the federated learning executables if needed"""
     
     # Get paths relative to this script
     script_dir = Path(__file__).parent
     app_dir = script_dir.parent
     root_dir = app_dir.parent.parent
     build_dir = root_dir / "build"
+    
+    # Check if executables already exist
+    server_exe = build_dir / "federated_server_app"
+    client_exe = build_dir / "federated_client_app"
+    
+    if server_exe.exists() and client_exe.exists():
+        print("Found existing executables")
+        return True, server_exe, client_exe
+    
+    print("Building federated learning executables (this may take a moment)...")
+    print("Note: Requires CMake and a C++ compiler")
     
     if not build_dir.exists():
         build_dir.mkdir()
@@ -74,13 +84,16 @@ def build_executables():
     )
     
     if result.returncode != 0:
-        print(f"Build failed: {result.stderr}")
+        print(f"\nBuild failed. Please ensure you have CMake and a C++ compiler installed.")
+        print(f"You can also build manually:")
+        print(f"  cd {root_dir}")
+        print(f"  mkdir -p build && cd build")
+        print(f"  cmake .. && make federated_server_app federated_client_app")
+        if result.stderr:
+            print(f"\nError details: {result.stderr}")
         return False, None, None
         
     # Check that executables exist
-    server_exe = build_dir / "federated_server_app"
-    client_exe = build_dir / "federated_client_app"
-    
     if not server_exe.exists() or not client_exe.exists():
         print("Build succeeded but executables not found")
         return False, None, None
