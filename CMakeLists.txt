@@ -52,3 +52,24 @@ target_link_libraries(server_app PRIVATE httplib::httplib nlohmann_json::nlohman
 add_executable(client_app apps/example/client_app.cpp src/client/tribune_client.cpp apps/example/src/data_collection_module.cpp src/protocol/parser.cpp src/mpc/sum_computation.cpp src/crypto/signature.cpp)
 target_include_directories(client_app PRIVATE apps/example ${SODIUM_INCLUDE_DIR})
 target_link_libraries(client_app PRIVATE httplib::httplib nlohmann_json::nlohmann_json ${SODIUM_LIBRARY})
+
+# Federated Machine Learning application
+add_executable(federated_server_app 
+    apps/federated-machinelearning/server_app.cpp 
+    src/server/tribune_server.cpp 
+    src/server/client_state.cpp 
+    src/protocol/parser.cpp 
+    apps/federated-machinelearning/src/federated_computation.cpp
+    src/crypto/signature.cpp)
+target_include_directories(federated_server_app PRIVATE apps/federated-machinelearning ${SODIUM_INCLUDE_DIR})
+target_link_libraries(federated_server_app PRIVATE httplib::httplib nlohmann_json::nlohmann_json ${SODIUM_LIBRARY})
+
+add_executable(federated_client_app 
+    apps/federated-machinelearning/client_app.cpp 
+    src/client/tribune_client.cpp 
+    apps/federated-machinelearning/src/federated_logout_module.cpp
+    apps/federated-machinelearning/src/federated_computation.cpp
+    src/protocol/parser.cpp 
+    src/crypto/signature.cpp)
+target_include_directories(federated_client_app PRIVATE apps/federated-machinelearning ${SODIUM_INCLUDE_DIR})
+target_link_libraries(federated_client_app PRIVATE httplib::httplib nlohmann_json::nlohmann_json ${SODIUM_LIBRARY})

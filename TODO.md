@@ -7,8 +7,12 @@
 ## Real-World Implementation
 - [ ] Try to implement a real usecase using a non-mock data collection module
 
-## Data Formats
-- [ ] JSON schemas for different computation types
+## Advanced Cryptographic Protocols
+- [ ] Investigate homomorphic encryption for multiplication operations
+- [ ] Implement Paillier encryption for additive homomorphic operations
+- [ ] Support for computing on (x,y) pairs without breaking relationships
+- [ ] Explore CKKS scheme for approximate arithmetic on encrypted data
+
 
 ## IMPLEMENTED
 
@@ -38,6 +42,7 @@
 - [x] SumComputation implementation for integer aggregation
 - [x] Computation registry system in TribuneClient
 - [x] Event computation_type field with JSON serialization
+- [x] Flexible computation_metadata field for parameterized requests
 - [x] Thread-safe shard validation and storage
 - [x] Check if all expected shards received for an event (hasAllShards())
 - [x] Execute registered computation when complete

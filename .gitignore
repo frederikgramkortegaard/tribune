@@ -14,6 +14,11 @@ Debug/
 bin/
 obj/
 
+# CMake dependencies
+_deps/
+**/build/
+**/_deps/
+
 # IDE-specific files
 .vs/
 .idea/
