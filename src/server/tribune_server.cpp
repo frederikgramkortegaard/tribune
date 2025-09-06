@@ -417,7 +417,7 @@ void TribuneServer::periodicEventChecker() {
       for (const auto& [event_id, active_event] : active_events_) {
         auto age = std::chrono::duration_cast<std::chrono::seconds>(now - active_event.created_time);
         
-        if (age.count() > 30) { // 30 second timeout
+        if (age.count() > 60) { // 60 second timeout for complex peer-to-peer operations
           auto responses_it = unprocessed_responses.find(event_id);
           int received_count = responses_it != unprocessed_responses.end() 
                                ? static_cast<int>(responses_it->second.size()) 

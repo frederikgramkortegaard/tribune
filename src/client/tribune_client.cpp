@@ -240,18 +240,8 @@ void TribuneClient::onEventAnnouncement(const Event &event, bool relay) {
     }
   }
 
-  // Store our own data shard (data is now a plain string number)
-  {
-    std::lock_guard<std::mutex> shards_lock(event_shards_mutex_);
-    try {
-      std::string shard_value = my_data;
-      event_shards_[event.event_id][client_id_] = shard_value;
-      DEBUG_DEBUG("Stored our own shard for event "
-                  << event.event_id << " (value: " << shard_value << ")");
-    } catch (const std::exception &e) {
-      DEBUG_ERROR("Error storing own data: " << e.what());
-    }
-  }
+  // Note: We'll store our own shard during shareDataWithPeers
+  // This happens after we split the data into shards
 
   // Add a small delay to ensure all participants receive the event announcement
   // before peer data sharing begins (prevents race conditions)
@@ -434,32 +424,65 @@ void TribuneClient::shareDataWithPeers(const Event &event,
                                        const std::string &my_data) {
   DEBUG_INFO("Sharing data with peers for event: " << event.event_id);
 
+  // Calculate total number of shards needed (one per participant, INCLUDING ourselves)
+  int num_participants = event.participants.size();
+  if (num_participants <= 1) {
+    DEBUG_WARN("No peers to share data with");
+    return;
+  }
+
+  // Generate shards using the data collection module
+  std::vector<std::string> shards;
+  {
+    std::lock_guard<std::mutex> lock(data_module_mutex_);
+    if (data_module_) {
+      shards = data_module_->shardData(my_data, num_participants);
+      DEBUG_INFO("Split data into " << shards.size() << " shards for " << num_participants << " participants");
+    } else {
+      DEBUG_ERROR("No data collection module available for sharding");
+      return;
+    }
+  }
+
+  if (shards.size() != static_cast<size_t>(num_participants)) {
+    DEBUG_ERROR("Shard count mismatch: expected " << num_participants << " got " << shards.size());
+    return;
+  }
+  
+  // Store our own shard (the first one)
+  {
+    std::lock_guard<std::mutex> shards_lock(event_shards_mutex_);
+    event_shards_[event.event_id][client_id_] = shards[0];
+    DEBUG_DEBUG("Stored our own shard: " << shards[0]);
+  }
+
+  // Send a different shard to each peer (starting from index 1, since we kept index 0)
+  int shard_index = 1;  // Start from 1 since we kept shard[0] for ourselves
   for (const auto &peer : event.participants) {
     // Skip ourselves
     if (peer.client_id == client_id_) {
       continue;
     }
 
-    DEBUG_DEBUG("Sending data to peer: " << peer.client_id << " at "
+    DEBUG_DEBUG("Sending shard " << shard_index << " to peer: " << peer.client_id << " at "
                                          << peer.client_host << ":"
                                          << peer.client_port);
-
-    // Split data into len(event.participants) - 1 shards
 
     try {
       httplib::Client cli(peer.client_host, std::stoi(peer.client_port));
 
-      // Create data sharing payload
+      // Create data sharing payload with the specific shard for this peer
       PeerDataMessage peer_msg;
       peer_msg.event_id = event.event_id;
       peer_msg.from_client = client_id_;
-      peer_msg.data = my_data;
+      peer_msg.data = shards[shard_index];  // Send the specific shard for this peer
       peer_msg.timestamp = std::chrono::system_clock::now();
       peer_msg.original_event =
           event; // Include server-signed event for propagation
 
       DEBUG_DEBUG("Creating peer message with event_id: " << peer_msg.event_id);
       DEBUG_DEBUG("Original event ID: " << peer_msg.original_event.event_id);
+      DEBUG_DEBUG("Sending shard value: " << shards[shard_index]);
 
       // Create signature
       std::string message =
@@ -472,15 +495,34 @@ void TribuneClient::shareDataWithPeers(const Event &event,
       auto res = cli.Post("/peer-data", payload.dump(), "application/json");
 
       if (res && res->status == 200) {
-        DEBUG_DEBUG("Successfully shared data with " << peer.client_id);
+        LOG("SHARD_SENT: Successfully sent shard " << shard_index << " to " << peer.client_id);
       } else {
-        DEBUG_WARN("Failed to share data with " << peer.client_id);
+        DEBUG_ERROR("SHARD_FAILED: Failed to send shard " << shard_index << " to " 
+                    << peer.client_id << " from " << client_id_ 
+                    << " (status: " << (res ? std::to_string(res->status) : "no response") << ")");
       }
 
     } catch (const std::exception &e) {
-      DEBUG_ERROR("Exception sharing data with " << peer.client_id << ": "
-                                                 << e.what());
+      DEBUG_ERROR("SHARD_EXCEPTION: Exception sending shard " << shard_index 
+                  << " to " << peer.client_id << " from " << client_id_ 
+                  << ": " << e.what());
     }
+    
+    // Move to next shard for next peer
+    shard_index++;
+  }
+  
+  // After sending all shards, check if we already have all shards needed for computation
+  bool all_shards_received = false;
+  {
+    std::lock_guard<std::mutex> shards_lock(event_shards_mutex_);
+    all_shards_received = hasAllShards(event.event_id);
+  }
+  
+  // Start computation if we have all shards
+  if (all_shards_received) {
+    DEBUG_DEBUG("All shards received for event " << event.event_id << " after sending our shards, starting computation");
+    computeAndSubmitResult(event.event_id);
   }
 }
 
@@ -500,10 +542,34 @@ bool TribuneClient::hasAllShards(const std::string &event_id) {
   const auto &received_shards = shards_it->second;
 
   // Check if we have shards from all participants (including ourselves)
+  // We store our own shard plus receive shards from all other participants
+  static int check_count = 0;
+  check_count++;
+  
+  int missing_count = 0;
+  std::vector<std::string> missing_from;
+  
   for (const auto &participant : event.participants) {
     if (received_shards.find(participant.client_id) == received_shards.end()) {
-      return false;
+      missing_count++;
+      missing_from.push_back(participant.client_id);
     }
+  }
+  
+  // After many checks, if still missing shards, log warning
+  if (missing_count > 0 && check_count > 100) {
+    std::stringstream error_msg;
+    error_msg << "STUCK: Client " << client_id_ << " for event " << event_id 
+              << " has " << received_shards.size() 
+              << "/" << event.participants.size() << " shards after " << check_count << " checks. Missing from: ";
+    for (const auto& missing_id : missing_from) {
+      error_msg << missing_id << " ";
+    }
+    DEBUG_WARN(error_msg.str());
+  }
+  
+  if (missing_count > 0) {
+    return false;
   }
 
   return true;

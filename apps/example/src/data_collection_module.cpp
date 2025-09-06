@@ -29,6 +29,9 @@ std::string MockDataCollectionModule::collectData(const Event &event) {
   int range = max_val - min_val + 1;
   int predictable_value = min_val + (client_hash % range);
 
+  // Print prominently for verification
+  std::cout << "CLIENT_VALUE: " << predictable_value << " (Client: " << client_id_ << ")" << std::endl;
+  
   DEBUG_DEBUG("Client " << client_id_ << " generated value: "
                         << predictable_value << " (range: " << min_val << "-" << max_val << ")");
 

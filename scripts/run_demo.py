@@ -2,6 +2,7 @@
 """
 Tribune MPC Demo Script
 Spawns a server and multiple clients with real Ed25519 keypairs
+Includes verification of secret sharing and sum computation
 """
 
 import subprocess
@@ -9,14 +10,21 @@ import time
 import signal
 import sys
 import os
+import re
 from concurrent.futures import ThreadPoolExecutor
 import threading
 
 # Configuration
 SERVER_HOST = "localhost"
 SERVER_PORT = 8080
-NUM_CLIENTS = 10
+NUM_CLIENTS = 4
 BASE_CLIENT_PORT = 18001
+DEMO_DURATION = 22  # Duration in seconds to run the demo (longer for peer-to-peer communication)
+
+# Global storage for verification
+client_values = []
+server_results = []
+client_outputs = []
 
 # Color codes for terminal output
 class Colors:
@@ -65,15 +73,38 @@ def generate_ed25519_keypair():
         public_hex = f"ed25519_public_{seed:08x}"
         return private_hex, public_hex
 
-def stream_output(process, client_id, color):
-    """Stream process output with colored prefixes"""
+def stream_output(process, client_id, color, capture_values=False):
+    """Stream process output with colored prefixes and optionally capture values"""
+    global client_values, server_results, client_outputs
+    
     while True:
         output = process.stdout.readline()
         if output == '' and process.poll() is not None:
             break
         if output:
+            line = output.strip()
             prefix = f"[{client_id}] "
-            print_colored(output.strip(), color, prefix)
+            print_colored(line, color, prefix)
+            
+            # Capture client values for verification
+            if capture_values and "CLIENT_VALUE:" in line:
+                match = re.search(r'CLIENT_VALUE:\s*(\d+)', line)
+                if match:
+                    value = int(match.group(1))
+                    client_values.append(value)
+                    print_colored(f"Captured value: {value}", Colors.WARNING)
+            
+            # Check for sharding evidence
+            if "shard" in line.lower() or "Split data into" in line:
+                client_outputs.append(f"{client_id}: {line}")
+            
+            # Capture server results
+            if client_id == "SERVER" and ("Aggregated sum:" in line or "Final Result:" in line or "Final result:" in line):
+                match = re.search(r':\s*(\d+)', line)
+                if match:
+                    result = int(match.group(1))
+                    server_results.append(result)
+                    print_colored(f"Server computed sum: {result}", Colors.WARNING)
 
 def run_server():
     """Run the Tribune server"""
@@ -91,7 +122,7 @@ def run_server():
         # Stream server output in a separate thread
         output_thread = threading.Thread(
             target=stream_output, 
-            args=(server_process, "SERVER", Colors.SERVER)
+            args=(server_process, "SERVER", Colors.SERVER, True)
         )
         output_thread.daemon = True
         output_thread.start()
@@ -130,7 +161,7 @@ def run_client(client_id, port):
         # Enable client output to debug connection issues
         output_thread = threading.Thread(
             target=stream_output, 
-            args=(client_process, client_name, Colors.CLIENT)
+            args=(client_process, client_name, Colors.CLIENT, True)
         )
         output_thread.daemon = True
         output_thread.start()
@@ -144,6 +175,50 @@ def run_client(client_id, port):
         print_colored(f"Error running client {client_id}: {e}", Colors.ERROR)
         return None, None
 
+def verify_results():
+    """Verify that secret sharing and sum computation worked correctly"""
+    global client_values, server_results, client_outputs
+    
+    print()
+    print_colored("=" * 60, Colors.BOLD)
+    print_colored("VERIFICATION RESULTS", Colors.BOLD)
+    print_colored("=" * 60, Colors.BOLD)
+    
+    # Check client values
+    if client_values:
+        expected_sum = sum(client_values)
+        print_colored(f"Client values collected: {client_values}", Colors.WARNING)
+        print_colored(f"Expected sum: {expected_sum}", Colors.WARNING)
+    else:
+        print_colored("ERROR: No client values captured!", Colors.ERROR)
+        print_colored("Make sure clients are printing CLIENT_VALUE:", Colors.ERROR)
+        return False
+    
+    # Check server results
+    if server_results:
+        print_colored(f"Server results: {server_results}", Colors.WARNING)
+        if expected_sum in server_results:
+            print_colored(f"SUCCESS: Server correctly computed sum {expected_sum}!", Colors.BOLD + Colors.CLIENT)
+        else:
+            print_colored(f"ERROR: Server sum mismatch! Expected {expected_sum}, got {server_results}", Colors.ERROR)
+            return False
+    else:
+        print_colored("WARNING: No server results captured", Colors.WARNING)
+    
+    # Check for secret sharing evidence
+    if client_outputs:
+        print_colored(f"\nSecret sharing evidence (found {len(client_outputs)} instances):", Colors.WARNING)
+        for evidence in client_outputs[:5]:  # Show first 5
+            print_colored(f"  - {evidence}", Colors.CLIENT)
+        print_colored("GOOD: Clients are using secret sharing!", Colors.BOLD + Colors.CLIENT)
+    else:
+        print_colored("WARNING: No evidence of secret sharing found!", Colors.ERROR)
+        print_colored("Clients may be sending full values instead of shards.", Colors.ERROR)
+        return False
+    
+    print_colored("=" * 60, Colors.BOLD)
+    return True
+
 def main():
     """Main demo function"""
     print_colored("=" * 60, Colors.BOLD)
@@ -152,6 +227,7 @@ def main():
     print()
     
     processes = []
+    start_time = time.time()
     
     try:
         # Start server
@@ -177,17 +253,22 @@ def main():
         
         print()
         print_colored("All processes started! MPC demo running...", Colors.BOLD + Colors.WARNING)
-        print_colored("Press Ctrl+C to stop all processes", Colors.WARNING)
+        print_colored(f"Running for {DEMO_DURATION} seconds...", Colors.WARNING)
         print_colored("=" * 60, Colors.BOLD)
         print()
         
-        # Keep main thread alive
-        while True:
+        # Run for specified duration
+        while time.time() - start_time < DEMO_DURATION:
             time.sleep(1)
             # Check if any process died
             for i, process in enumerate(processes):
                 if process.poll() is not None:
                     print_colored(f"Process {i} terminated with code {process.returncode}", Colors.ERROR)
+        
+        # Verify results
+        print_colored("\nDemo duration complete. Verifying results...", Colors.WARNING)
+        time.sleep(2)  # Give a moment for final outputs
+        success = verify_results()
     
     except KeyboardInterrupt:
         print_colored("\nShutting down demo...", Colors.WARNING)
