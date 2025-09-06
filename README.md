@@ -14,7 +14,7 @@ This repository includes a **complete federated learning implementation** demons
 **Quick demo:** `python3 apps/federated-machinelearning/scripts/run_demo.py`  
 *(The script will automatically build the executables if needed - requires CMake and a C++ compiler)*
 
-The implementation shows real-world federated learning with gradient computation, secure aggregation, and distributed training rounds. See [`apps/federated-machinelearning/`](apps/federated-machinelearning/) for details.
+Work In Progrss Notice: The implementation shows real-world federated learning with gradient computation, secure aggregation, and distributed training rounds. See [`apps/federated-machinelearning/`](apps/federated-machinelearning/) for details.
 
 ## Architecture
 
