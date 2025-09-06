@@ -402,11 +402,30 @@ void TribuneClient::onPeerDataReceived(const PeerDataMessage &peer_msg) {
 
   // Start computation if we have all shards
   if (all_shards_received) {
-    DEBUG_DEBUG("All shards received for event " << peer_msg.event_id
-                                                 << ", starting computation");
-    std::thread([this, event_id = peer_msg.event_id]() {
-      computeAndSubmitResult(event_id);
-    }).detach();
+    // Check if computation is already in progress for this event
+    bool should_compute = false;
+    {
+      std::lock_guard<std::mutex> lock(computing_events_mutex_);
+      if (computing_events_.find(peer_msg.event_id) == computing_events_.end()) {
+        computing_events_.insert(peer_msg.event_id);
+        should_compute = true;
+      }
+    }
+    
+    if (should_compute) {
+      DEBUG_DEBUG("All shards received for event " << peer_msg.event_id
+                                                   << ", starting computation");
+      std::thread([this, event_id = peer_msg.event_id]() {
+        computeAndSubmitResult(event_id);
+        // Remove from computing set after completion
+        {
+          std::lock_guard<std::mutex> lock(computing_events_mutex_);
+          computing_events_.erase(event_id);
+        }
+      }).detach();
+    } else {
+      DEBUG_DEBUG("Computation already in progress for event " << peer_msg.event_id);
+    }
   }
 
   // Periodic cleanup of deduplication caches
@@ -526,12 +545,31 @@ void TribuneClient::shareDataWithPeers(const Event &event,
 
   // Start computation if we have all shards
   if (all_shards_received) {
-    DEBUG_DEBUG("All shards received for event "
-                << event.event_id
-                << " after sending our shards, starting computation");
-    std::thread([this, event_id = event.event_id]() {
-      computeAndSubmitResult(event_id);
-    }).detach();
+    // Check if computation is already in progress for this event
+    bool should_compute = false;
+    {
+      std::lock_guard<std::mutex> lock(computing_events_mutex_);
+      if (computing_events_.find(event.event_id) == computing_events_.end()) {
+        computing_events_.insert(event.event_id);
+        should_compute = true;
+      }
+    }
+    
+    if (should_compute) {
+      DEBUG_DEBUG("All shards received for event "
+                  << event.event_id
+                  << " after sending our shards, starting computation");
+      std::thread([this, event_id = event.event_id]() {
+        computeAndSubmitResult(event_id);
+        // Remove from computing set after completion
+        {
+          std::lock_guard<std::mutex> lock(computing_events_mutex_);
+          computing_events_.erase(event_id);
+        }
+      }).detach();
+    } else {
+      DEBUG_DEBUG("Computation already in progress for event " << event.event_id);
+    }
   }
 }
 

@@ -18,9 +18,7 @@ public:
   // the number of shards = event.participants.size() so we can send
   // a shard to each peer and keep one four ourselves
   virtual std::vector<std::string> shardData(const std::string &data,
-                                             const Event &event) {
-    return shardData(data, num_shards);
-  }
+                                             const Event &event) = 0;
 
   // Optional: called when all peer data is received for final aggregation
   virtual std::string aggregateData(const Event &event,

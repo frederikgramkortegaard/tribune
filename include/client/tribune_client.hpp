@@ -11,6 +11,7 @@
 #include <string>
 #include <thread>
 #include <unordered_map>
+#include <unordered_set>
 
 class TribuneClient {
 public:
@@ -83,6 +84,10 @@ private:
   std::unordered_map<std::string, std::unique_ptr<MPCComputation>>
       computations_;
   std::mutex computations_mutex_;
+  
+  // Track events currently being computed to prevent duplicate computation threads
+  std::unordered_set<std::string> computing_events_;
+  std::mutex computing_events_mutex_;
 
   // TTL-based deduplication for broadcast storm prevention
   struct RecentItem {
