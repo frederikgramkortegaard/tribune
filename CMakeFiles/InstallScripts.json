@@ -1,0 +1,10 @@
+{
+	"InstallScripts" : 
+	[
+		"/Users/fgk/Developer/tribune/cmake_install.cmake",
+		"/Users/fgk/Developer/tribune/_deps/httplib-build/cmake_install.cmake",
+		"/Users/fgk/Developer/tribune/_deps/nlohmann_json-build/cmake_install.cmake",
+		"/Users/fgk/Developer/tribune/_deps/stduuid-build/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

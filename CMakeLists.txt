@@ -25,6 +25,12 @@ FetchContent_Declare(
   GIT_TAG        v3.11.3
 )
 
+FetchContent_Declare(
+  stduuid
+  GIT_REPOSITORY https://github.com/mariusbancila/stduuid.git
+  GIT_TAG        v1.2.3
+)
+
 # Find libsodium (homebrew installation on macOS)
 find_path(SODIUM_INCLUDE_DIR sodium.h 
     PATHS /opt/homebrew/include /usr/local/include
@@ -39,37 +45,41 @@ else()
     message(FATAL_ERROR "libsodium not found")
 endif()
 
-FetchContent_MakeAvailable(httplib nlohmann_json)
+FetchContent_MakeAvailable(httplib nlohmann_json stduuid)
 
 # Include directories
 include_directories(include)
+include_directories(${SODIUM_INCLUDE_DIR})
 
-# Example applications
-add_executable(server_app apps/example/server_app.cpp src/server/tribune_server.cpp src/server/client_state.cpp src/protocol/parser.cpp src/mpc/sum_computation.cpp src/crypto/signature.cpp)
-target_include_directories(server_app PRIVATE ${SODIUM_INCLUDE_DIR})
-target_link_libraries(server_app PRIVATE httplib::httplib nlohmann_json::nlohmann_json ${SODIUM_LIBRARY})
+# Collect source files
+file(GLOB_RECURSE TRIBUNE_SOURCES 
+    src/*.cpp
+)
 
-add_executable(client_app apps/example/client_app.cpp src/client/tribune_client.cpp apps/example/src/data_collection_module.cpp src/protocol/parser.cpp src/mpc/sum_computation.cpp src/crypto/signature.cpp)
-target_include_directories(client_app PRIVATE apps/example ${SODIUM_INCLUDE_DIR})
-target_link_libraries(client_app PRIVATE httplib::httplib nlohmann_json::nlohmann_json ${SODIUM_LIBRARY})
+# Create tribune library
+add_library(tribune_lib STATIC ${TRIBUNE_SOURCES})
 
-# Federated Machine Learning application
-add_executable(federated_server_app 
-    apps/federated-machinelearning/server_app.cpp 
-    src/server/tribune_server.cpp 
-    src/server/client_state.cpp 
-    src/protocol/parser.cpp 
-    apps/federated-machinelearning/src/federated_computation.cpp
-    src/crypto/signature.cpp)
-target_include_directories(federated_server_app PRIVATE apps/federated-machinelearning ${SODIUM_INCLUDE_DIR})
-target_link_libraries(federated_server_app PRIVATE httplib::httplib nlohmann_json::nlohmann_json ${SODIUM_LIBRARY})
+# Link dependencies
+target_link_libraries(tribune_lib 
+    PUBLIC 
+        httplib::httplib
+        nlohmann_json::nlohmann_json
+        stduuid
+        ${SODIUM_LIBRARY}
+)
 
-add_executable(federated_client_app 
-    apps/federated-machinelearning/client_app.cpp 
-    src/client/tribune_client.cpp 
-    apps/federated-machinelearning/src/federated_logout_module.cpp
-    apps/federated-machinelearning/src/federated_computation.cpp
-    src/protocol/parser.cpp 
-    src/crypto/signature.cpp)
-target_include_directories(federated_client_app PRIVATE apps/federated-machinelearning ${SODIUM_INCLUDE_DIR})
-target_link_libraries(federated_client_app PRIVATE httplib::httplib nlohmann_json::nlohmann_json ${SODIUM_LIBRARY})
+# Set include directories for the library
+target_include_directories(tribune_lib 
+    PUBLIC 
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${SODIUM_INCLUDE_DIR}
+)
+
+# Optional: Create a simple test executable
+option(BUILD_EXAMPLES "Build example executables" ON)
+
+if(BUILD_EXAMPLES)
+    # Create a simple example executable to test compilation
+    add_executable(tribune_test_build examples/test_build.cpp)
+    target_link_libraries(tribune_test_build tribune_lib)
+endif()
