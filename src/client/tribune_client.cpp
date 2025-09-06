@@ -447,16 +447,17 @@ void TribuneClient::shareDataWithPeers(const Event &event,
     return;
   }
 
-  // Generate shards using the data collection module
+  // Generate shards using the MPC computation
   std::vector<std::string> shards;
   {
-    std::lock_guard<std::mutex> lock(data_module_mutex_);
-    if (data_module_) {
-      shards = data_module_->shardData(my_data, event);
+    std::lock_guard<std::mutex> lock(computations_mutex_);
+    auto comp_it = computations_.find(event.computation_type);
+    if (comp_it != computations_.end()) {
+      shards = comp_it->second->shardData(my_data, event);
       DEBUG_INFO("Split data into " << shards.size() << " shards for "
                                     << num_participants << " participants");
     } else {
-      DEBUG_ERROR("No data collection module available for sharding");
+      DEBUG_ERROR("No MPC computation registered for type: " << event.computation_type);
       return;
     }
   }
