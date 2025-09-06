@@ -600,7 +600,22 @@ bool TribuneClient::hasAllShards(const std::string &event_id) {
 
 void TribuneClient::computeAndSubmitResult(const std::string &event_id) {
   LOG("=== COMPUTING RESULT FOR EVENT: " << event_id << " ===");
+  
+  // Run the computation
+  std::string result = runComputation(event_id);
+  
+  if (result.empty()) {
+    DEBUG_ERROR("Computation failed for event: " << event_id);
+    return;
+  }
+  
+  // Submit the result
+  if (!submitResult(event_id, result)) {
+    DEBUG_ERROR("Failed to submit result for event: " << event_id);
+  }
+}
 
+std::string TribuneClient::runComputation(const std::string &event_id) {
   Event event;
   std::vector<std::string> shards;
   std::string computation_type;
@@ -615,7 +630,7 @@ void TribuneClient::computeAndSubmitResult(const std::string &event_id) {
 
     if (event_it == active_events_.end() || shards_it == event_shards_.end()) {
       DEBUG_ERROR("Error: Event or shards not found for " << event_id);
-      return;
+      return "";
     }
 
     event = event_it->second;
@@ -639,15 +654,17 @@ void TribuneClient::computeAndSubmitResult(const std::string &event_id) {
     if (comp_it == computations_.end()) {
       DEBUG_ERROR(
           "Error: No computation registered for type: " << computation_type);
-      return;
+      return "";
     }
 
     result = comp_it->second->compute(shards, event);
   }
 
   LOG("Computation complete! Result: " << result);
+  return result;
+}
 
-  // Send EventResponse back to server with result
+bool TribuneClient::submitResult(const std::string &event_id, const std::string &result) {
   try {
     httplib::Client cli(seed_host_, seed_port_);
 
@@ -668,16 +685,19 @@ void TribuneClient::computeAndSubmitResult(const std::string &event_id) {
     if (res && res->status == 200) {
       DEBUG_INFO("Successfully sent result to server!");
       DEBUG_DEBUG("Server response: " << res->body);
+      return true;
     } else {
       DEBUG_ERROR("Failed to send result to server. Status: "
                   << (res ? std::to_string(res->status) : "No response"));
       if (res) {
         DEBUG_DEBUG("Response body: " << res->body);
       }
+      return false;
     }
 
   } catch (const std::exception &e) {
     DEBUG_ERROR("Exception sending result to server: " << e.what());
+    return false;
   }
 }
 

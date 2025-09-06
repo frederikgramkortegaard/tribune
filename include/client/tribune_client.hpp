@@ -106,6 +106,8 @@ private:
   void runEventListener();
   void setupEventRoutes();
   void computeAndSubmitResult(const std::string &event_id);
+  std::string runComputation(const std::string &event_id);
+  bool submitResult(const std::string &event_id, const std::string &result);
   bool hasAllShards(const std::string &event_id);
   void cleanupRecentItems();
   bool verifyEventFromServer(const Event &event);
