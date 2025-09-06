@@ -40,6 +40,11 @@ std::string FederatedLogoutGradientModule::collectData(const Event& event) {
               << features[1] << "h, day=" << features[2] 
               << ", online=" << features[3] << "h] -> p=" << actual_probability);
     
+    // Print local gradient for validation
+    std::cout << "LOCAL_GRADIENT: [" << gradient[0] << ", " << gradient[1] 
+              << ", " << gradient[2] << ", " << gradient[3] << "] (Client: " 
+              << client_id_ << ")" << std::endl;
+    
     return serializeGradient(gradient);
 }
 
@@ -70,19 +75,42 @@ std::vector<std::string> FederatedLogoutGradientModule::shardData(const std::str
         return {serializeGradient(gradient)};
     }
     
-    std::vector<std::string> shards;
-    size_t params_per_shard = gradient.size() / num_shards;
-    size_t remainder = gradient.size() % num_shards;
+    // Use additive secret sharing for secure multi-party federated learning
+    // Each shard will be the same size (full gradient) and sum to the original
     
-    size_t start_idx = 0;
+    std::vector<std::string> shards;
+    std::vector<std::vector<double>> gradient_shards(num_shards);
+    
+    // Initialize all shards with same size as original gradient (4 parameters)
     for (int i = 0; i < num_shards; ++i) {
-        size_t shard_size = params_per_shard + (i < remainder ? 1 : 0);
+        gradient_shards[i].resize(gradient.size(), 0.0);
+    }
+    
+    // Generate random shards using additive secret sharing
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_real_distribution<double> dis(-10.0, 10.0);  // Reasonable range for gradients
+    
+    // For each parameter in the gradient
+    for (size_t param_idx = 0; param_idx < gradient.size(); ++param_idx) {
+        double sum_of_random_shards = 0.0;
         
-        std::vector<double> shard(gradient.begin() + start_idx, 
-                                 gradient.begin() + start_idx + shard_size);
+        // Generate random values for first (num_shards-1) shards
+        for (int shard_idx = 0; shard_idx < num_shards - 1; ++shard_idx) {
+            double random_value = dis(gen);
+            gradient_shards[shard_idx][param_idx] = random_value;
+            sum_of_random_shards += random_value;
+        }
         
-        shards.push_back(serializeGradient(shard));
-        start_idx += shard_size;
+        // Last shard ensures sum equals original gradient value
+        gradient_shards[num_shards - 1][param_idx] = gradient[param_idx] - sum_of_random_shards;
+    }
+    
+    // Serialize all shards (each is a full 4-parameter gradient)
+    for (int i = 0; i < num_shards; ++i) {
+        shards.push_back(serializeGradient(gradient_shards[i]));
+        DEBUG_DEBUG("Shard " << i << " gradient: [" 
+                  << gradient_shards[i][0] << ", " << gradient_shards[i][1] << ", ...]");
     }
     
     DEBUG_INFO("Split masked gradient into " << shards.size() << " shards");
@@ -177,15 +205,28 @@ std::vector<double> FederatedLogoutGradientModule::deserializeGradient(const std
     }
 }
 
-std::string FederatedLogoutGradientModule::computeSharedSecret(const std::string& other_public_key) const {
+std::string FederatedLogoutGradientModule::computeSharedSecret(const std::string& other_public_key, const std::string& other_client_id) const {
     // Simple deterministic shared secret from combining keys
     // In production: use proper ECDH with Ed25519 -> X25519 conversion
     std::hash<std::string> hasher;
     
-    // Make it symmetric: smaller key first ensures same result on both ends
-    std::string combined = (private_key_ < other_public_key) ? 
-        private_key_ + other_public_key : 
-        other_public_key + private_key_;
+    // Simple deterministic shared secret generation
+    // Both clients must generate the same shared secret for their pair
+    // Solution: concatenate both keys in a deterministic order
+    
+    // Compare keys as hex numbers to determine ordering
+    // Convert key strings to numeric values for proper comparison
+    size_t my_key_hash = hasher(private_key_);
+    size_t their_key_hash = hasher(other_public_key);
+    
+    std::string combined;
+    if (my_key_hash < their_key_hash) {
+        // Our key has smaller hash value
+        combined = private_key_ + ":" + other_public_key;
+    } else {
+        // Their key has smaller hash value
+        combined = other_public_key + ":" + private_key_;
+    }
         
     return std::to_string(hasher(combined));
 }
@@ -209,7 +250,7 @@ void FederatedLogoutGradientModule::applySecureAggregationMasks(std::vector<doub
     for (const auto& participant : event.participants) {
         if (participant.client_id == client_id_) continue; // Skip self
         
-        auto shared_secret = computeSharedSecret(participant.ed25519_pub);
+        auto shared_secret = computeSharedSecret(participant.ed25519_pub, participant.client_id);
         auto mask = generateMask(shared_secret, gradient.size());
         
         // Add mask if our ID is smaller, subtract if larger (ensures cancellation)

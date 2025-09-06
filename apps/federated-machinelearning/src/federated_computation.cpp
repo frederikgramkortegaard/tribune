@@ -99,6 +99,19 @@ std::string FederatedAggregationComputation::aggregateResults(const std::vector<
     DEBUG_DEBUG("Global gradient sample: [" << (global_gradient.size() > 0 ? global_gradient[0] : 0.0) 
               << ", " << (global_gradient.size() > 1 ? global_gradient[1] : 0.0) << ", ...]");
     
+    // Print full global gradient for validation
+    if (global_gradient.size() >= 4) {
+        std::cout << "GLOBAL_GRADIENT: [" << global_gradient[0] << ", " << global_gradient[1] 
+                  << ", " << global_gradient[2] << ", " << global_gradient[3] << "]" << std::endl;
+    } else {
+        std::cout << "GLOBAL_GRADIENT: [";
+        for (size_t i = 0; i < global_gradient.size(); ++i) {
+            std::cout << global_gradient[i];
+            if (i < global_gradient.size() - 1) std::cout << ", ";
+        }
+        std::cout << "]" << std::endl;
+    }
+    
     // Apply gradient to model weights with learning rate
     auto updated_weights = applyGradientToWeights(global_gradient);
     

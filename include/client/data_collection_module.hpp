@@ -17,6 +17,12 @@ public:
     // Shards should appear random to prevent trivial value reconstruction
     virtual std::vector<std::string> shardData(const std::string& data, int num_shards) = 0;
     
+    // Extended version with event context for advanced secure aggregation
+    // Default implementation falls back to standard shardData method
+    virtual std::vector<std::string> shardData(const std::string& data, int num_shards, const Event& event) {
+        return shardData(data, num_shards);
+    }
+    
     // Optional: called when all peer data is received for final aggregation
     virtual std::string aggregateData(const Event& event, 
                                     const std::vector<std::string>& peer_data) {

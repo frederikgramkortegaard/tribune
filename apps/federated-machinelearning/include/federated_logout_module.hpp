@@ -13,7 +13,7 @@ public:
     std::vector<std::string> shardData(const std::string& data, int num_shards) override;
     
     // Extended version with event context for secure aggregation
-    std::vector<std::string> shardData(const std::string& data, int num_shards, const Event& event);
+    std::vector<std::string> shardData(const std::string& data, int num_shards, const Event& event) override;
     
 private:
     std::string client_id_;
@@ -41,6 +41,6 @@ private:
     std::vector<double> deserializeGradient(const std::string& data) const;
     
     // Utility for shared secret generation
-    std::string computeSharedSecret(const std::string& other_public_key) const;
+    std::string computeSharedSecret(const std::string& other_public_key, const std::string& other_client_id) const;
     std::vector<double> generateMask(const std::string& shared_secret, size_t size) const;
 };

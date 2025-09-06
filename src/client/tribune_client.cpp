@@ -436,7 +436,7 @@ void TribuneClient::shareDataWithPeers(const Event &event,
   {
     std::lock_guard<std::mutex> lock(data_module_mutex_);
     if (data_module_) {
-      shards = data_module_->shardData(my_data, num_participants);
+      shards = data_module_->shardData(my_data, num_participants, event);
       DEBUG_INFO("Split data into " << shards.size() << " shards for " << num_participants << " participants");
     } else {
       DEBUG_ERROR("No data collection module available for sharding");
