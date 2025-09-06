@@ -259,30 +259,6 @@ src/crypto/signature.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/tribune_lib.dir/build.make CMakeFiles/tribune_lib.dir/src/crypto/signature.cpp.s
 .PHONY : src/crypto/signature.cpp.s
 
-src/mpc/sum_computation.o: src/mpc/sum_computation.cpp.o
-.PHONY : src/mpc/sum_computation.o
-
-# target to build an object file
-src/mpc/sum_computation.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/tribune_lib.dir/build.make CMakeFiles/tribune_lib.dir/src/mpc/sum_computation.cpp.o
-.PHONY : src/mpc/sum_computation.cpp.o
-
-src/mpc/sum_computation.i: src/mpc/sum_computation.cpp.i
-.PHONY : src/mpc/sum_computation.i
-
-# target to preprocess a source file
-src/mpc/sum_computation.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/tribune_lib.dir/build.make CMakeFiles/tribune_lib.dir/src/mpc/sum_computation.cpp.i
-.PHONY : src/mpc/sum_computation.cpp.i
-
-src/mpc/sum_computation.s: src/mpc/sum_computation.cpp.s
-.PHONY : src/mpc/sum_computation.s
-
-# target to generate assembly for a file
-src/mpc/sum_computation.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/tribune_lib.dir/build.make CMakeFiles/tribune_lib.dir/src/mpc/sum_computation.cpp.s
-.PHONY : src/mpc/sum_computation.cpp.s
-
 src/protocol/parser.o: src/protocol/parser.cpp.o
 .PHONY : src/protocol/parser.o
 
@@ -378,9 +354,6 @@ help:
 	@echo "... src/crypto/signature.o"
 	@echo "... src/crypto/signature.i"
 	@echo "... src/crypto/signature.s"
-	@echo "... src/mpc/sum_computation.o"
-	@echo "... src/mpc/sum_computation.i"
-	@echo "... src/mpc/sum_computation.s"
 	@echo "... src/protocol/parser.o"
 	@echo "... src/protocol/parser.i"
 	@echo "... src/protocol/parser.s"

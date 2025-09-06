@@ -3,8 +3,6 @@ file(REMOVE_RECURSE
   "CMakeFiles/tribune_lib.dir/src/client/tribune_client.cpp.o.d"
   "CMakeFiles/tribune_lib.dir/src/crypto/signature.cpp.o"
   "CMakeFiles/tribune_lib.dir/src/crypto/signature.cpp.o.d"
-  "CMakeFiles/tribune_lib.dir/src/mpc/sum_computation.cpp.o"
-  "CMakeFiles/tribune_lib.dir/src/mpc/sum_computation.cpp.o.d"
   "CMakeFiles/tribune_lib.dir/src/protocol/parser.cpp.o"
   "CMakeFiles/tribune_lib.dir/src/protocol/parser.cpp.o.d"
   "CMakeFiles/tribune_lib.dir/src/server/client_state.cpp.o"

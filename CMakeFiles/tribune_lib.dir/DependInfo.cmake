@@ -10,7 +10,6 @@ set(CMAKE_DEPENDS_LANGUAGES
 set(CMAKE_DEPENDS_DEPENDENCY_FILES
   "/Users/fgk/Developer/tribune/src/client/tribune_client.cpp" "CMakeFiles/tribune_lib.dir/src/client/tribune_client.cpp.o" "gcc" "CMakeFiles/tribune_lib.dir/src/client/tribune_client.cpp.o.d"
   "/Users/fgk/Developer/tribune/src/crypto/signature.cpp" "CMakeFiles/tribune_lib.dir/src/crypto/signature.cpp.o" "gcc" "CMakeFiles/tribune_lib.dir/src/crypto/signature.cpp.o.d"
-  "/Users/fgk/Developer/tribune/src/mpc/sum_computation.cpp" "CMakeFiles/tribune_lib.dir/src/mpc/sum_computation.cpp.o" "gcc" "CMakeFiles/tribune_lib.dir/src/mpc/sum_computation.cpp.o.d"
   "/Users/fgk/Developer/tribune/src/protocol/parser.cpp" "CMakeFiles/tribune_lib.dir/src/protocol/parser.cpp.o" "gcc" "CMakeFiles/tribune_lib.dir/src/protocol/parser.cpp.o.d"
   "/Users/fgk/Developer/tribune/src/server/client_state.cpp" "CMakeFiles/tribune_lib.dir/src/server/client_state.cpp.o" "gcc" "CMakeFiles/tribune_lib.dir/src/server/client_state.cpp.o.d"
   "/Users/fgk/Developer/tribune/src/server/tribune_server.cpp" "CMakeFiles/tribune_lib.dir/src/server/tribune_server.cpp.o" "gcc" "CMakeFiles/tribune_lib.dir/src/server/tribune_server.cpp.o.d"

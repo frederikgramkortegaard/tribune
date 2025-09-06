@@ -1,2 +1,2 @@
-/usr/bin/ar qc libtribune_lib.a CMakeFiles/tribune_lib.dir/src/client/tribune_client.cpp.o CMakeFiles/tribune_lib.dir/src/crypto/signature.cpp.o CMakeFiles/tribune_lib.dir/src/mpc/sum_computation.cpp.o CMakeFiles/tribune_lib.dir/src/protocol/parser.cpp.o CMakeFiles/tribune_lib.dir/src/server/client_state.cpp.o CMakeFiles/tribune_lib.dir/src/server/tribune_server.cpp.o
+/usr/bin/ar qc libtribune_lib.a CMakeFiles/tribune_lib.dir/src/client/tribune_client.cpp.o CMakeFiles/tribune_lib.dir/src/crypto/signature.cpp.o CMakeFiles/tribune_lib.dir/src/protocol/parser.cpp.o CMakeFiles/tribune_lib.dir/src/server/client_state.cpp.o CMakeFiles/tribune_lib.dir/src/server/tribune_server.cpp.o
 /usr/bin/ranlib libtribune_lib.a

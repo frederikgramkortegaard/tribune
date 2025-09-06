@@ -100,24 +100,10 @@ CMakeFiles/tribune_lib.dir/src/crypto/signature.cpp.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/tribune_lib.dir/src/crypto/signature.cpp.s"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /Users/fgk/Developer/tribune/src/crypto/signature.cpp -o CMakeFiles/tribune_lib.dir/src/crypto/signature.cpp.s
 
-CMakeFiles/tribune_lib.dir/src/mpc/sum_computation.cpp.o: CMakeFiles/tribune_lib.dir/flags.make
-CMakeFiles/tribune_lib.dir/src/mpc/sum_computation.cpp.o: src/mpc/sum_computation.cpp
-CMakeFiles/tribune_lib.dir/src/mpc/sum_computation.cpp.o: CMakeFiles/tribune_lib.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/fgk/Developer/tribune/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Building CXX object CMakeFiles/tribune_lib.dir/src/mpc/sum_computation.cpp.o"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/tribune_lib.dir/src/mpc/sum_computation.cpp.o -MF CMakeFiles/tribune_lib.dir/src/mpc/sum_computation.cpp.o.d -o CMakeFiles/tribune_lib.dir/src/mpc/sum_computation.cpp.o -c /Users/fgk/Developer/tribune/src/mpc/sum_computation.cpp
-
-CMakeFiles/tribune_lib.dir/src/mpc/sum_computation.cpp.i: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing CXX source to CMakeFiles/tribune_lib.dir/src/mpc/sum_computation.cpp.i"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -E /Users/fgk/Developer/tribune/src/mpc/sum_computation.cpp > CMakeFiles/tribune_lib.dir/src/mpc/sum_computation.cpp.i
-
-CMakeFiles/tribune_lib.dir/src/mpc/sum_computation.cpp.s: cmake_force
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling CXX source to assembly CMakeFiles/tribune_lib.dir/src/mpc/sum_computation.cpp.s"
-	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -S /Users/fgk/Developer/tribune/src/mpc/sum_computation.cpp -o CMakeFiles/tribune_lib.dir/src/mpc/sum_computation.cpp.s
-
 CMakeFiles/tribune_lib.dir/src/protocol/parser.cpp.o: CMakeFiles/tribune_lib.dir/flags.make
 CMakeFiles/tribune_lib.dir/src/protocol/parser.cpp.o: src/protocol/parser.cpp
 CMakeFiles/tribune_lib.dir/src/protocol/parser.cpp.o: CMakeFiles/tribune_lib.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/fgk/Developer/tribune/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Building CXX object CMakeFiles/tribune_lib.dir/src/protocol/parser.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/fgk/Developer/tribune/CMakeFiles --progress-num=$(CMAKE_PROGRESS_3) "Building CXX object CMakeFiles/tribune_lib.dir/src/protocol/parser.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/tribune_lib.dir/src/protocol/parser.cpp.o -MF CMakeFiles/tribune_lib.dir/src/protocol/parser.cpp.o.d -o CMakeFiles/tribune_lib.dir/src/protocol/parser.cpp.o -c /Users/fgk/Developer/tribune/src/protocol/parser.cpp
 
 CMakeFiles/tribune_lib.dir/src/protocol/parser.cpp.i: cmake_force
@@ -131,7 +117,7 @@ CMakeFiles/tribune_lib.dir/src/protocol/parser.cpp.s: cmake_force
 CMakeFiles/tribune_lib.dir/src/server/client_state.cpp.o: CMakeFiles/tribune_lib.dir/flags.make
 CMakeFiles/tribune_lib.dir/src/server/client_state.cpp.o: src/server/client_state.cpp
 CMakeFiles/tribune_lib.dir/src/server/client_state.cpp.o: CMakeFiles/tribune_lib.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/fgk/Developer/tribune/CMakeFiles --progress-num=$(CMAKE_PROGRESS_5) "Building CXX object CMakeFiles/tribune_lib.dir/src/server/client_state.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/fgk/Developer/tribune/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Building CXX object CMakeFiles/tribune_lib.dir/src/server/client_state.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/tribune_lib.dir/src/server/client_state.cpp.o -MF CMakeFiles/tribune_lib.dir/src/server/client_state.cpp.o.d -o CMakeFiles/tribune_lib.dir/src/server/client_state.cpp.o -c /Users/fgk/Developer/tribune/src/server/client_state.cpp
 
 CMakeFiles/tribune_lib.dir/src/server/client_state.cpp.i: cmake_force
@@ -145,7 +131,7 @@ CMakeFiles/tribune_lib.dir/src/server/client_state.cpp.s: cmake_force
 CMakeFiles/tribune_lib.dir/src/server/tribune_server.cpp.o: CMakeFiles/tribune_lib.dir/flags.make
 CMakeFiles/tribune_lib.dir/src/server/tribune_server.cpp.o: src/server/tribune_server.cpp
 CMakeFiles/tribune_lib.dir/src/server/tribune_server.cpp.o: CMakeFiles/tribune_lib.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/fgk/Developer/tribune/CMakeFiles --progress-num=$(CMAKE_PROGRESS_6) "Building CXX object CMakeFiles/tribune_lib.dir/src/server/tribune_server.cpp.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/fgk/Developer/tribune/CMakeFiles --progress-num=$(CMAKE_PROGRESS_5) "Building CXX object CMakeFiles/tribune_lib.dir/src/server/tribune_server.cpp.o"
 	/usr/bin/c++ $(CXX_DEFINES) $(CXX_INCLUDES) $(CXX_FLAGS) -MD -MT CMakeFiles/tribune_lib.dir/src/server/tribune_server.cpp.o -MF CMakeFiles/tribune_lib.dir/src/server/tribune_server.cpp.o.d -o CMakeFiles/tribune_lib.dir/src/server/tribune_server.cpp.o -c /Users/fgk/Developer/tribune/src/server/tribune_server.cpp
 
 CMakeFiles/tribune_lib.dir/src/server/tribune_server.cpp.i: cmake_force
@@ -160,7 +146,6 @@ CMakeFiles/tribune_lib.dir/src/server/tribune_server.cpp.s: cmake_force
 tribune_lib_OBJECTS = \
 "CMakeFiles/tribune_lib.dir/src/client/tribune_client.cpp.o" \
 "CMakeFiles/tribune_lib.dir/src/crypto/signature.cpp.o" \
-"CMakeFiles/tribune_lib.dir/src/mpc/sum_computation.cpp.o" \
 "CMakeFiles/tribune_lib.dir/src/protocol/parser.cpp.o" \
 "CMakeFiles/tribune_lib.dir/src/server/client_state.cpp.o" \
 "CMakeFiles/tribune_lib.dir/src/server/tribune_server.cpp.o"
@@ -170,13 +155,12 @@ tribune_lib_EXTERNAL_OBJECTS =
 
 libtribune_lib.a: CMakeFiles/tribune_lib.dir/src/client/tribune_client.cpp.o
 libtribune_lib.a: CMakeFiles/tribune_lib.dir/src/crypto/signature.cpp.o
-libtribune_lib.a: CMakeFiles/tribune_lib.dir/src/mpc/sum_computation.cpp.o
 libtribune_lib.a: CMakeFiles/tribune_lib.dir/src/protocol/parser.cpp.o
 libtribune_lib.a: CMakeFiles/tribune_lib.dir/src/server/client_state.cpp.o
 libtribune_lib.a: CMakeFiles/tribune_lib.dir/src/server/tribune_server.cpp.o
 libtribune_lib.a: CMakeFiles/tribune_lib.dir/build.make
 libtribune_lib.a: CMakeFiles/tribune_lib.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/Users/fgk/Developer/tribune/CMakeFiles --progress-num=$(CMAKE_PROGRESS_7) "Linking CXX static library libtribune_lib.a"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/Users/fgk/Developer/tribune/CMakeFiles --progress-num=$(CMAKE_PROGRESS_6) "Linking CXX static library libtribune_lib.a"
 	$(CMAKE_COMMAND) -P CMakeFiles/tribune_lib.dir/cmake_clean_target.cmake
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/tribune_lib.dir/link.txt --verbose=$(VERBOSE)
 
