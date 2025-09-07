@@ -70,13 +70,11 @@ void TribuneServer::handleEndpointPeers(const httplib::Request &req,
   {
     std::lock_guard<std::mutex> lock(roster_mutex_);
     for (auto const &[key, val] : this->roster_) {
-      if (val.isClientParticipating()) {
-        if (!first) {
-          output += ",";
-        }
-        output += std::format("\"{}:{}\"", val.client_host_, val.client_port_);
-        first = false;
+      if (!first) {
+        output += ",";
       }
+      output += std::format("\"{}:{}\"", val.client_host_, val.client_port_);
+      first = false;
     }
   }
   output += "]}";
@@ -131,7 +129,7 @@ void TribuneServer::handleEndpointSubmit(const httplib::Request &req,
       std::lock_guard<std::mutex> events_lock(active_events_mutex_);
 
       auto responses_it = unprocessed_responses_.find(parsed_res.event_id);
-      if (responses_it != unprocessed_responses.end()) {
+      if (responses_it != unprocessed_responses_.end()) {
         received_count = static_cast<int>(responses_it->second.size()) +
                          1; // +1 for current result
       } else {
@@ -167,8 +165,6 @@ void TribuneServer::handleEndpointSubmit(const httplib::Request &req,
           this->unprocessed_responses_[parsed_res.event_id]
                                      [parsed_res.client_id] = parsed_res;
         }
-
-        this->roster_[parsed_res.client_id].markReceivedEvent();
 
         // Check if we can aggregate results for any completed events
         checkForCompleteResults();
@@ -283,14 +279,12 @@ std::vector<ClientInfo> TribuneServer::selectParticipants() {
 
   std::lock_guard<std::mutex> lock(roster_mutex_);
   for (const auto &[client_id, client_state] : roster_) {
-    if (client_state.isClientParticipating()) {
-      ClientInfo info;
-      info.client_id = client_state.client_id_;
-      info.client_host = client_state.client_host_;
-      info.client_port = client_state.client_port_;
-      info.ed25519_pub = client_state.ed25519_pub_;
-      active_clients.push_back(info);
-    }
+    ClientInfo info;
+    info.client_id = client_state.client_id_;
+    info.client_host = client_state.client_host_;
+    info.client_port = client_state.client_port_;
+    info.ed25519_pub = client_state.ed25519_pub_;
+    active_clients.push_back(info);
   }
 
   DEBUG_DEBUG("Found " << active_clients.size() << " active clients");
@@ -361,13 +355,13 @@ void TribuneServer::checkForCompleteResults() {
 
   // Check each active event
   for (const auto &[event_id, active_event] : active_events_) {
-    auto responses_it = unprocessed_responses.find(event_id);
+    auto responses_it = unprocessed_responses_.find(event_id);
 
     // Count received responses
     int received_count = 0;
     std::vector<std::string> results;
 
-    if (responses_it != unprocessed_responses.end()) {
+    if (responses_it != unprocessed_responses_.end()) {
       received_count = static_cast<int>(responses_it->second.size());
       for (const auto &[client_id, response] : responses_it->second) {
         results.push_back(response.data);
@@ -409,7 +403,7 @@ void TribuneServer::checkForCompleteResults() {
   // Clean up completed events
   for (const std::string &event_id : completed_events) {
     active_events_.erase(event_id);
-    unprocessed_responses.erase(event_id);
+    unprocessed_responses_.erase(event_id);
   }
 }
 
