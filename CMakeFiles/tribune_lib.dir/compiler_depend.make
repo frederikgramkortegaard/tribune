@@ -1454,6 +1454,7 @@ CMakeFiles/tribune_lib.dir/src/client/tribune_client.cpp.o: src/client/tribune_c
   include/events/events.hpp \
   include/mpc/mpc_computation.hpp \
   include/protocol/parser.hpp \
+  include/utils/connection_pool.hpp \
   include/utils/logging.hpp \
   /opt/homebrew/include/brotli/decode.h \
   /opt/homebrew/include/brotli/encode.h \
@@ -5881,6 +5882,7 @@ CMakeFiles/tribune_lib.dir/src/server/tribune_server.cpp.o: src/server/tribune_s
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/ratio \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/regex \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/set \
+  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/shared_mutex \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/span \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/sstream \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/stack \
@@ -6370,10 +6372,6 @@ include/server/server_config.hpp:
 
 src/server/tribune_server.cpp:
 
-/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/Security.framework/Headers/cssmconfig.h:
-
-/opt/homebrew/include/sodium/version.h:
-
 /opt/homebrew/include/sodium/runtime.h:
 
 /opt/homebrew/include/sodium/export.h:
@@ -6571,6 +6569,8 @@ src/crypto/signature.cpp:
 /opt/homebrew/include/brotli/encode.h:
 
 include/utils/logging.hpp:
+
+include/utils/connection_pool.hpp:
 
 include/mpc/mpc_computation.hpp:
 
@@ -9373,6 +9373,10 @@ include/protocol/parser.hpp:
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/Security.framework/Headers/cssmapi.h:
 
 /opt/homebrew/include/brotli/port.h:
+
+/opt/homebrew/include/sodium/version.h:
+
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/Security.framework/Headers/cssmconfig.h:
 
 /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/__algorithm/ranges_remove_if.h:
 

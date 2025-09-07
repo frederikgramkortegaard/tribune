@@ -502,7 +502,7 @@ void TribuneClient::shareDataWithPeers(const Event &event,
                 << peer.client_host << ":" << peer.client_port);
 
     try {
-      httplib::Client cli(peer.client_host, std::stoi(peer.client_port));
+      auto* client = connection_pool_.getConnection(peer.client_host, std::stoi(peer.client_port));
 
       // Create data sharing payload with the specific shard for this peer
       PeerDataMessage peer_msg;
@@ -526,7 +526,7 @@ void TribuneClient::shareDataWithPeers(const Event &event,
 
       nlohmann::json payload = peer_msg;
 
-      auto res = cli.Post("/peer-data", payload.dump(), "application/json");
+      auto res = client->Post("/peer-data", payload.dump(), "application/json");
 
       if (res && res->status == 200) {
         LOG("SHARD_SENT: Successfully sent shard " << shard_index << " to "
@@ -741,11 +741,12 @@ void TribuneClient::periodicHealthChecker() {
     
     if (!running_) break;
     
+    // Clean up expired connections
+    connection_pool_.cleanupExpiredConnections();
+    
     // Send ping to server
     try {
-      httplib::Client cli(seed_host_, seed_port_);
-      cli.set_connection_timeout(2, 0);
-      cli.set_read_timeout(3, 0);
+      auto* client = connection_pool_.getConnection(seed_host_, seed_port_);
       
       EventResponse ping_msg;
       ping_msg.type_ = Ping;
@@ -753,7 +754,7 @@ void TribuneClient::periodicHealthChecker() {
       ping_msg.timestamp = std::chrono::system_clock::now();
       
       nlohmann::json j = ping_msg;
-      auto res = cli.Post("/ping", j.dump(), "application/json");
+      auto res = client->Post("/ping", j.dump(), "application/json");
       
       if (res && res->status == 200) {
         if (!server_alive_) {
@@ -764,12 +765,16 @@ void TribuneClient::periodicHealthChecker() {
         if (server_alive_) {
           DEBUG_WARN("Server connection lost");
           server_alive_ = false;
+          // Remove failed connection from pool
+          connection_pool_.removeConnection(seed_host_, seed_port_);
         }
       }
     } catch (const std::exception &e) {
       if (server_alive_) {
         DEBUG_WARN("Server ping failed: " << e.what());
         server_alive_ = false;
+        // Remove failed connection from pool
+        connection_pool_.removeConnection(seed_host_, seed_port_);
       }
     }
   }

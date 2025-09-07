@@ -246,13 +246,9 @@ void TribuneServer::announceEvent(const Event &event, std::string *result) {
     announcement_threads.emplace_back([this, participant, json_str,
                                        event_id = event.event_id]() {
       try {
-        httplib::Client cli(participant.client_host,
-                            std::stoi(participant.client_port));
-        cli.set_connection_timeout(2, 0); // 2 second connection timeout
-        cli.set_read_timeout(5, 0);       // 5 second read timeout
-        cli.set_write_timeout(5, 0);      // 5 second write timeout
-
-        auto res = cli.Post("/event", json_str, "application/json");
+        auto* client = connection_pool_.getConnection(participant.client_host,
+                                                      std::stoi(participant.client_port));
+        auto res = client->Post("/event", json_str, "application/json");
 
         if (res && res->status == 200) {
           DEBUG_DEBUG("Sent Event with ID: " << event_id << ", to Client: "
@@ -520,6 +516,9 @@ void TribuneServer::periodicPinger() {
     
     if (should_stop_) break;
     
+    // Clean up expired connections
+    connection_pool_.cleanupExpiredConnections();
+    
     std::vector<std::string> dead_clients;
     {
       std::shared_lock<std::shared_mutex> roster_lock(roster_mutex_);
@@ -556,6 +555,11 @@ void TribuneServer::periodicPinger() {
         std::unique_lock<std::shared_mutex> lock(roster_mutex_);
         for (const std::string &client_id : removable_clients) {
           DEBUG_INFO("Removing dead client: " << client_id);
+          
+          // Remove pooled connection for this client
+          connection_pool_.removeConnection(roster_[client_id].client_host_,
+                                            std::stoi(roster_[client_id].client_port_));
+          
           roster_.erase(client_id);
         }
       }

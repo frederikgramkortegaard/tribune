@@ -3,6 +3,7 @@
 #include "events/events.hpp"
 #include "mpc/mpc_computation.hpp"
 #include "server_config.hpp"
+#include "utils/connection_pool.hpp"
 #include <algorithm>
 #include <atomic>
 #include <chrono>
@@ -57,6 +58,9 @@ private:
   std::random_device rd_;
   std::mt19937 rng_;
   std::mutex rng_mutex_;
+  
+  // Connection pooling
+  ConnectionPool connection_pool_;
 
   // Transport Layer Management (read-heavy: peer queries, participant selection)
   std::unordered_map<std::string, ClientState> roster_;

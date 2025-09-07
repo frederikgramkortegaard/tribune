@@ -3,6 +3,7 @@
 #include "data_collection_module.hpp"
 #include "events/events.hpp"
 #include "mpc/mpc_computation.hpp"
+#include "utils/connection_pool.hpp"
 #include <atomic>
 #include <chrono>
 #include <httplib.h>
@@ -71,6 +72,7 @@ private:
   // Server health monitoring
   std::atomic<bool> server_alive_{true};
   std::thread health_checker_thread_;
+  ConnectionPool connection_pool_;
   void periodicHealthChecker();
 
   // Active events we're participating in (read-heavy: status checks, data collection)

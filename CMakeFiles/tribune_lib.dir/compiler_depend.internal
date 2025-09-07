@@ -1455,6 +1455,7 @@ CMakeFiles/tribune_lib.dir/src/client/tribune_client.cpp.o
  /Users/fgk/Developer/tribune/include/events/events.hpp
  /Users/fgk/Developer/tribune/include/mpc/mpc_computation.hpp
  /Users/fgk/Developer/tribune/include/protocol/parser.hpp
+ /Users/fgk/Developer/tribune/include/utils/connection_pool.hpp
  /Users/fgk/Developer/tribune/include/utils/logging.hpp
  /opt/homebrew/include/brotli/decode.h
  /opt/homebrew/include/brotli/encode.h
@@ -5886,6 +5887,7 @@ CMakeFiles/tribune_lib.dir/src/server/tribune_server.cpp.o
  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/ratio
  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/regex
  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/set
+ /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/shared_mutex
  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/span
  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/sstream
  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/stack

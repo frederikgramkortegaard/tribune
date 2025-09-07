@@ -1089,6 +1089,7 @@ CMakeFiles/tribune_lib.dir/src/server/tribune_server.cpp.o: \
   /Users/fgk/Developer/tribune/include/server/client_state.hpp \
   /Users/fgk/Developer/tribune/include/mpc/mpc_computation.hpp \
   /Users/fgk/Developer/tribune/include/server/server_config.hpp \
+  /Users/fgk/Developer/tribune/include/utils/connection_pool.hpp \
   /Users/fgk/Developer/tribune/_deps/httplib-src/httplib.h \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/arpa/inet.h \
   /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/netinet/in.h \
