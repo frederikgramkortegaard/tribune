@@ -6,6 +6,7 @@
 #include <iomanip>
 #include <iostream>
 #include <random>
+#include <shared_mutex>
 #include <sstream>
 #include <thread>
 #include <uuid.h>
@@ -51,7 +52,8 @@ void TribuneClient::setDataCollectionModule(
 
 void TribuneClient::registerComputation(
     const std::string &type, std::unique_ptr<MPCComputation> computation) {
-  std::lock_guard<std::mutex> lock(computations_mutex_);
+  // WRITE operation - registering new computation type
+  std::unique_lock<std::shared_mutex> lock(computations_mutex_);
   computations_[type] = std::move(computation);
   DEBUG_INFO("Registered MPC computation: " << type);
 }
@@ -218,7 +220,7 @@ void TribuneClient::onEventAnnouncement(const Event &event, bool relay) {
 
   // Store event for validation and computation
   {
-    std::lock_guard<std::mutex> lock(active_events_mutex_);
+    std::unique_lock<std::shared_mutex> lock(active_events_mutex_);
     active_events_[event.event_id] = event;
   }
 
@@ -292,7 +294,7 @@ void TribuneClient::onPeerDataReceived(const PeerDataMessage &peer_msg) {
   std::string shard_key = peer_msg.event_id + "|" + peer_msg.from_client;
 
   {
-    std::lock_guard<std::mutex> lock(recent_items_mutex_);
+    std::unique_lock<std::shared_mutex> lock(recent_items_mutex_);
 
     // Only check for duplicate shards (allow shard processing even if we know
     // the event)
@@ -308,7 +310,7 @@ void TribuneClient::onPeerDataReceived(const PeerDataMessage &peer_msg) {
   // 3. Process peer-propagated event if we don't know about it
   bool have_event = false;
   {
-    std::lock_guard<std::mutex> active_lock(active_events_mutex_);
+    std::unique_lock<std::shared_mutex> active_lock(active_events_mutex_);
     have_event = active_events_.find(peer_msg.event_id) != active_events_.end();
   }
 
@@ -337,7 +339,7 @@ void TribuneClient::onPeerDataReceived(const PeerDataMessage &peer_msg) {
     return;
   }
 
-  std::lock_guard<std::mutex> active_lock(active_events_mutex_);
+  std::unique_lock<std::shared_mutex> active_lock(active_events_mutex_);
   auto event_it = active_events_.find(peer_msg.event_id);
   if (event_it == active_events_.end()) {
     DEBUG_DEBUG("Event " << peer_msg.event_id << " not found in active events");
@@ -386,7 +388,7 @@ void TribuneClient::onPeerDataReceived(const PeerDataMessage &peer_msg) {
   // Store the valid shard
   bool all_shards_received = false;
   {
-    std::lock_guard<std::mutex> shards_lock(event_shards_mutex_);
+    std::unique_lock<std::shared_mutex> shards_lock(event_shards_mutex_);
     try {
       // peer_msg.data is now a plain string number, not JSON
       std::string shard_value = peer_msg.data;
@@ -453,7 +455,7 @@ void TribuneClient::shareDataWithPeers(const Event &event,
   // Generate shards using the MPC computation
   std::vector<std::string> shards;
   {
-    std::lock_guard<std::mutex> lock(computations_mutex_);
+    std::unique_lock<std::shared_mutex> lock(computations_mutex_);
     auto comp_it = computations_.find(event.computation_type);
     if (comp_it != computations_.end()) {
       shards = comp_it->second->shardData(my_data, event);
@@ -474,7 +476,7 @@ void TribuneClient::shareDataWithPeers(const Event &event,
 
   // Store our own shard (the first one)
   {
-    std::lock_guard<std::mutex> shards_lock(event_shards_mutex_);
+    std::unique_lock<std::shared_mutex> shards_lock(event_shards_mutex_);
     event_shards_[event.event_id][client_id_] = shards[0];
     DEBUG_DEBUG("Stored our own shard: " << shards[0]);
   }
@@ -544,7 +546,7 @@ void TribuneClient::shareDataWithPeers(const Event &event,
   // computation
   bool all_shards_received = false;
   {
-    std::lock_guard<std::mutex> shards_lock(event_shards_mutex_);
+    std::unique_lock<std::shared_mutex> shards_lock(event_shards_mutex_);
     all_shards_received = hasAllShards(event.event_id);
   }
 
@@ -628,8 +630,8 @@ std::string TribuneClient::runComputation(const std::string &event_id) {
 
   // Collect event info and shards
   {
-    std::lock_guard<std::mutex> active_lock(active_events_mutex_);
-    std::lock_guard<std::mutex> shards_lock(event_shards_mutex_);
+    std::shared_lock<std::shared_mutex> active_lock(active_events_mutex_);
+    std::shared_lock<std::shared_mutex> shards_lock(event_shards_mutex_);
 
     auto event_it = active_events_.find(event_id);
     auto shards_it = event_shards_.find(event_id);
@@ -654,7 +656,7 @@ std::string TribuneClient::runComputation(const std::string &event_id) {
   // Find and execute computation
   std::string result;
   {
-    std::lock_guard<std::mutex> comp_lock(computations_mutex_);
+    std::shared_lock<std::shared_mutex> comp_lock(computations_mutex_);
     auto comp_it = computations_.find(computation_type);
 
     if (comp_it == computations_.end()) {
@@ -722,7 +724,7 @@ void TribuneClient::stop() {
 }
 
 void TribuneClient::cleanupRecentItems() {
-  std::lock_guard<std::mutex> lock(recent_items_mutex_);
+  std::unique_lock<std::shared_mutex> lock(recent_items_mutex_);
   auto now = std::chrono::steady_clock::now();
 
   // Clean expired events

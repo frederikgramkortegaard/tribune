@@ -1526,4 +1526,5 @@ CMakeFiles/tribune_lib.dir/src/server/tribune_server.cpp.o: \
   /opt/homebrew/include/brotli/shared_dictionary.h \
   /opt/homebrew/include/brotli/types.h \
   /opt/homebrew/include/brotli/encode.h \
+  /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/c++/v1/shared_mutex \
   /Users/fgk/Developer/tribune/include/utils/logging.hpp

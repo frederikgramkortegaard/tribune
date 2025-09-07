@@ -4,6 +4,7 @@
 #include "utils/logging.hpp"
 #include <format>
 #include <iostream>
+#include <shared_mutex>
 #include <thread>
 #include <vector>
 
@@ -68,7 +69,7 @@ void TribuneServer::handleEndpointPeers(const httplib::Request &req,
   std::string output = "{\"peers\":[";
   bool first = true;
   {
-    std::lock_guard<std::mutex> lock(roster_mutex_);
+    std::shared_lock<std::shared_mutex> lock(roster_mutex_);
     for (auto const &[key, val] : this->roster_) {
       if (!first) {
         output += ",";
@@ -97,7 +98,7 @@ void TribuneServer::handleEndpointConnect(const httplib::Request &req,
                                                     << "'");
 
     {
-      std::lock_guard<std::mutex> lock(roster_mutex_);
+      std::unique_lock<std::shared_mutex> lock(roster_mutex_);
       this->roster_[parsed_res.client_id] = state;
       DEBUG_DEBUG("Roster size after adding: " << this->roster_.size());
     }
@@ -125,8 +126,8 @@ void TribuneServer::handleEndpointSubmit(const httplib::Request &req,
     int received_count = 0;
     int expected_count = 0;
     {
-      std::lock_guard<std::mutex> responses_lock(unprocessed_responses_mutex_);
-      std::lock_guard<std::mutex> events_lock(active_events_mutex_);
+      std::shared_lock<std::shared_mutex> responses_lock(unprocessed_responses_mutex_);
+      std::shared_lock<std::shared_mutex> events_lock(active_events_mutex_);
 
       auto responses_it = unprocessed_responses_.find(parsed_res.event_id);
       if (responses_it != unprocessed_responses_.end()) {
@@ -152,15 +153,16 @@ void TribuneServer::handleEndpointSubmit(const httplib::Request &req,
                                        << "' is in roster...");
 
     {
-      std::lock_guard<std::mutex> roster_lock(roster_mutex_);
+      std::shared_lock<std::shared_mutex> roster_lock(roster_mutex_);
       DEBUG_DEBUG("Current roster contents:");
       for (const auto &[id, _] : this->roster_) {
         DEBUG_DEBUG("  - '" << id << "'");
       }
 
       if (this->roster_.find(parsed_res.client_id) != this->roster_.end()) {
+        roster_lock.unlock();
         {
-          std::lock_guard<std::mutex> responses_lock(
+          std::unique_lock<std::shared_mutex> responses_lock(
               unprocessed_responses_mutex_);
           this->unprocessed_responses_[parsed_res.event_id]
                                      [parsed_res.client_id] = parsed_res;
@@ -213,9 +215,8 @@ void TribuneServer::announceEvent(const Event &event, std::string *result) {
                      .count()
               << "ms");
 
-  // Track this event as active
   {
-    std::lock_guard<std::mutex> lock(active_events_mutex_);
+    std::unique_lock<std::shared_mutex> lock(active_events_mutex_);
     active_events_.emplace(event.event_id,
                            ActiveEvent{
                                .event_id = event.event_id,
@@ -277,7 +278,7 @@ std::vector<ClientInfo> TribuneServer::selectParticipants() {
   // Get all active participating clients
   std::vector<ClientInfo> active_clients;
 
-  std::lock_guard<std::mutex> lock(roster_mutex_);
+  std::shared_lock<std::shared_mutex> lock(roster_mutex_);
   for (const auto &[client_id, client_state] : roster_) {
     ClientInfo info;
     info.client_id = client_state.client_id_;
@@ -342,14 +343,14 @@ TribuneServer::createEvent(EventType type, const std::string &event_id,
 
 void TribuneServer::registerComputation(
     const std::string &type, std::unique_ptr<MPCComputation> computation) {
-  std::lock_guard<std::mutex> lock(computations_mutex_);
+  std::unique_lock<std::shared_mutex> lock(computations_mutex_);
   computations_[type] = std::move(computation);
   DEBUG_INFO("Server registered MPC computation: " << type);
 }
 
 void TribuneServer::checkForCompleteResults() {
-  std::lock_guard<std::mutex> responses_lock(unprocessed_responses_mutex_);
-  std::lock_guard<std::mutex> events_lock(active_events_mutex_);
+  std::shared_lock<std::shared_mutex> responses_lock(unprocessed_responses_mutex_);
+  std::shared_lock<std::shared_mutex> events_lock(active_events_mutex_);
 
   std::vector<std::string> completed_events;
 
@@ -374,8 +375,7 @@ void TribuneServer::checkForCompleteResults() {
                            << "/" << active_event.expected_participants
                            << " responses)");
 
-      // Process the complete results
-      std::lock_guard<std::mutex> comp_lock(computations_mutex_);
+      std::shared_lock<std::shared_mutex> comp_lock(computations_mutex_);
       auto comp_it = computations_.find(active_event.computation_type);
 
       if (comp_it != computations_.end()) {
@@ -400,10 +400,17 @@ void TribuneServer::checkForCompleteResults() {
     }
   }
 
-  // Clean up completed events
-  for (const std::string &event_id : completed_events) {
-    active_events_.erase(event_id);
-    unprocessed_responses_.erase(event_id);
+  if (!completed_events.empty()) {
+    events_lock.unlock();
+    responses_lock.unlock();
+    
+    std::unique_lock<std::shared_mutex> write_events_lock(active_events_mutex_);
+    std::unique_lock<std::shared_mutex> write_responses_lock(unprocessed_responses_mutex_);
+    
+    for (const std::string &event_id : completed_events) {
+      active_events_.erase(event_id);
+      unprocessed_responses_.erase(event_id);
+    }
   }
 }
 
@@ -422,8 +429,8 @@ void TribuneServer::periodicEventChecker() {
     std::vector<std::string> timed_out_events;
 
     {
-      std::lock_guard<std::mutex> events_lock(active_events_mutex_);
-      std::lock_guard<std::mutex> responses_lock(unprocessed_responses_mutex_);
+      std::shared_lock<std::shared_mutex> events_lock(active_events_mutex_);
+      std::shared_lock<std::shared_mutex> responses_lock(unprocessed_responses_mutex_);
 
       for (const auto &[event_id, active_event] : active_events_) {
         auto age = std::chrono::duration_cast<std::chrono::seconds>(
@@ -446,10 +453,17 @@ void TribuneServer::periodicEventChecker() {
         }
       }
 
-      // Clean up timed out events
-      for (const std::string &event_id : timed_out_events) {
-        active_events_.erase(event_id);
-        unprocessed_responses_.erase(event_id);
+      if (!timed_out_events.empty()) {
+        events_lock.unlock();
+        responses_lock.unlock();
+        
+        std::unique_lock<std::shared_mutex> write_events_lock(active_events_mutex_);
+        std::unique_lock<std::shared_mutex> write_responses_lock(unprocessed_responses_mutex_);
+        
+        for (const std::string &event_id : timed_out_events) {
+          active_events_.erase(event_id);
+          unprocessed_responses_.erase(event_id);
+        }
       }
     }
 
@@ -458,7 +472,7 @@ void TribuneServer::periodicEventChecker() {
 
     // Print status if there are active events
     {
-      std::lock_guard<std::mutex> lock(active_events_mutex_);
+      std::shared_lock<std::shared_mutex> lock(active_events_mutex_);
       if (!active_events_.empty()) {
         DEBUG_DEBUG("Active events: " << active_events_.size());
       }

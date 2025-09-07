@@ -7,7 +7,9 @@
 #include <chrono>
 #include <httplib.h>
 #include <memory>
+#include <mutex>
 #include <queue>
+#include <shared_mutex>
 #include <string>
 #include <thread>
 #include <unordered_map>
@@ -65,14 +67,14 @@ private:
   std::atomic<bool> running_;
   httplib::Server event_server_;
 
-  // Active events we're participating in
+  // Active events we're participating in (read-heavy: status checks, data collection)
   std::unordered_map<std::string, Event> active_events_;
-  std::mutex active_events_mutex_;
+  std::shared_mutex active_events_mutex_;
 
-  // Shards storage: <event_id, <client_id, data>>
+  // Shards storage: <event_id, <client_id, data>> (read-heavy: completion checks)
   std::unordered_map<std::string, std::unordered_map<std::string, std::string>>
       event_shards_;
-  std::mutex event_shards_mutex_;
+  std::shared_mutex event_shards_mutex_;
 
   // Note: Orphan shards are no longer needed with peer event propagation
 
@@ -80,23 +82,23 @@ private:
   std::unique_ptr<DataCollectionModule> data_module_;
   std::mutex data_module_mutex_;
 
-  // MPC computations
+  // MPC computations (read-heavy: computation lookups)
   std::unordered_map<std::string, std::unique_ptr<MPCComputation>>
       computations_;
-  std::mutex computations_mutex_;
+  std::shared_mutex computations_mutex_;
   
   // Track events currently being computed to prevent duplicate computation threads
   std::unordered_set<std::string> computing_events_;
   std::mutex computing_events_mutex_;
 
-  // TTL-based deduplication for broadcast storm prevention
+  // TTL-based deduplication for broadcast storm prevention (read-heavy: duplicate checks)
   struct RecentItem {
     std::chrono::steady_clock::time_point received_time;
   };
   std::unordered_map<std::string, RecentItem> recent_events_;
   std::unordered_map<std::string, RecentItem>
       recent_shards_; // event_id + "|" + client_id
-  std::mutex recent_items_mutex_;
+  std::shared_mutex recent_items_mutex_;
   int cleanup_counter_ = 0; // Counter for periodic cleanup
   static constexpr int RECENT_ITEMS_TTL_SECONDS = 60; // 2x event timeout
   static constexpr int EVENT_TIMEOUT_SECONDS = 30;    // Match server timeout
