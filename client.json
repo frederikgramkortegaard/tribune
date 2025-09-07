@@ -1,0 +1,10 @@
+{
+  "server_host": "localhost",
+  "server_port": 8080,
+  "listen_host": "localhost",
+  "listen_port": 0,
+  "health_check_interval_seconds": 10,
+  "server_timeout_seconds": 30,
+  "connection_timeout_seconds": 2,
+  "read_timeout_seconds": 5
+}

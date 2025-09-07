@@ -1,0 +1,10 @@
+{
+  "host": "localhost",
+  "port": 8080,
+  "min_participants": 3,
+  "max_participants": 10,
+  "event_announce_interval_seconds": 40,
+  "event_timeout_boundary": 120,
+  "ping_interval_seconds": 10,
+  "client_timeout_seconds": 30
+}
