@@ -48,3 +48,12 @@ conan_install/
 *.swp
 *.bak
 *~
+
+# Security - certificates and keys
+certs/
+*.pem
+*.key
+*.crt
+*.cer
+*.p12
+*.pfx

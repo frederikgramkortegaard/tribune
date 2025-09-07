@@ -6,5 +6,7 @@
   "health_check_interval_seconds": 10,
   "server_timeout_seconds": 30,
   "connection_timeout_seconds": 2,
-  "read_timeout_seconds": 5
+  "read_timeout_seconds": 5,
+  "use_tls": true,
+  "verify_server_cert": false
 }
