@@ -1,6 +1,7 @@
 #pragma once
 #include <string>
 #include <fstream>
+#include <stdexcept>
 #include <nlohmann/json.hpp>
 
 struct ServerConfig {
@@ -46,9 +47,48 @@ struct ServerConfig {
         if (config.contains("event_timeout_boundary")) event_timeout_boundary = config["event_timeout_boundary"];
         if (config.contains("ping_interval_seconds")) ping_interval_seconds = config["ping_interval_seconds"];
         if (config.contains("client_timeout_seconds")) client_timeout_seconds = config["client_timeout_seconds"];
-      } catch (const std::exception&) {
-        // If config file is invalid, just use defaults
+        
+        validate();
+      } catch (const std::exception& e) {
+        throw std::runtime_error("Failed to load config from " + configFile + ": " + e.what());
       }
+    } else {
+      validate();
+    }
+  }
+  
+private:
+  void validate() {
+    if (port < 1 || port > 65535) {
+      throw std::invalid_argument("Invalid port: " + std::to_string(port) + ". Must be 1-65535");
+    }
+    
+    if (min_participants < 1) {
+      throw std::invalid_argument("Invalid min_participants: " + std::to_string(min_participants) + ". Must be >= 1");
+    }
+    
+    if (max_participants < min_participants) {
+      throw std::invalid_argument("Invalid max_participants: " + std::to_string(max_participants) + ". Must be >= min_participants (" + std::to_string(min_participants) + ")");
+    }
+    
+    if (event_announce_interval_seconds < 1) {
+      throw std::invalid_argument("Invalid event_announce_interval_seconds: " + std::to_string(event_announce_interval_seconds) + ". Must be >= 1");
+    }
+    
+    if (event_timeout_boundary < 1) {
+      throw std::invalid_argument("Invalid event_timeout_boundary: " + std::to_string(event_timeout_boundary) + ". Must be >= 1");
+    }
+    
+    if (ping_interval_seconds < 1) {
+      throw std::invalid_argument("Invalid ping_interval_seconds: " + std::to_string(ping_interval_seconds) + ". Must be >= 1");
+    }
+    
+    if (client_timeout_seconds < ping_interval_seconds) {
+      throw std::invalid_argument("Invalid client_timeout_seconds: " + std::to_string(client_timeout_seconds) + ". Must be >= ping_interval_seconds (" + std::to_string(ping_interval_seconds) + ")");
+    }
+    
+    if (host.empty()) {
+      throw std::invalid_argument("Host cannot be empty");
     }
   }
 };
