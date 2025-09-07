@@ -1,5 +1,6 @@
 #pragma once
 #include <string>
+#include <chrono>
 
 enum ClientConnectionState {
   CONNECTED,
@@ -23,5 +24,9 @@ public:
   std::string client_port_;
   std::string client_id_;
   std::string ed25519_pub_;
+  std::chrono::steady_clock::time_point last_ping_time_;
+  
+  bool isAlive(int timeout_seconds) const;
+  void updatePingTime();
 };
 

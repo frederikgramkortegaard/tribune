@@ -148,6 +148,12 @@ void TribuneClient::setupEventRoutes() {
                           "application/json");
         }
       });
+  
+  event_server_.Post(
+      "/ping", [this](const httplib::Request &req, httplib::Response &res) {
+        res.status = 200;
+        res.set_content("{\"status\":\"pong\"}", "application/json");
+      });
 
   // Setup the /peer-data endpoint to receive data from other clients
   event_server_.Post("/peer-data", [this](const httplib::Request &req,
@@ -202,6 +208,7 @@ void TribuneClient::startListening() {
 
   running_ = true;
   listener_thread_ = std::thread(&TribuneClient::runEventListener, this);
+  health_checker_thread_ = std::thread(&TribuneClient::periodicHealthChecker, this);
   LOG("Started event listener on port " << listen_port_);
 }
 
@@ -718,9 +725,56 @@ void TribuneClient::stop() {
     if (listener_thread_.joinable()) {
       listener_thread_.join();
     }
+    if (health_checker_thread_.joinable()) {
+      health_checker_thread_.join();
+    }
 
     LOG("Client stopped");
   }
+}
+
+void TribuneClient::periodicHealthChecker() {
+  DEBUG_INFO("Started health checker thread");
+  
+  while (running_) {
+    std::this_thread::sleep_for(std::chrono::seconds(10));
+    
+    if (!running_) break;
+    
+    // Send ping to server
+    try {
+      httplib::Client cli(seed_host_, seed_port_);
+      cli.set_connection_timeout(2, 0);
+      cli.set_read_timeout(3, 0);
+      
+      EventResponse ping_msg;
+      ping_msg.type_ = Ping;
+      ping_msg.client_id = client_id_;
+      ping_msg.timestamp = std::chrono::system_clock::now();
+      
+      nlohmann::json j = ping_msg;
+      auto res = cli.Post("/ping", j.dump(), "application/json");
+      
+      if (res && res->status == 200) {
+        if (!server_alive_) {
+          DEBUG_INFO("Server connection restored");
+          server_alive_ = true;
+        }
+      } else {
+        if (server_alive_) {
+          DEBUG_WARN("Server connection lost");
+          server_alive_ = false;
+        }
+      }
+    } catch (const std::exception &e) {
+      if (server_alive_) {
+        DEBUG_WARN("Server ping failed: " << e.what());
+        server_alive_ = false;
+      }
+    }
+  }
+  
+  DEBUG_INFO("Stopped health checker thread");
 }
 
 void TribuneClient::cleanupRecentItems() {

@@ -6,7 +6,7 @@
 #include <vector>
 
 enum EventType { DataRequestEvent = 0 };
-enum ResponseType { DataPart = 0, ConnectionRequest };
+enum ResponseType { DataPart = 0, ConnectionRequest, Ping, Pong };
 
 struct ClientInfo {
   std::string client_id;

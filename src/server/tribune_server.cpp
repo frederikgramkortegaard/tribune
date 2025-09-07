@@ -24,9 +24,10 @@ TribuneServer::~TribuneServer() { stop(); }
 void TribuneServer::start() {
   LOG("Starting aggregator server on http://" << host_ << ":" << port_);
 
-  // Start periodic event checker thread
+  // Start periodic threads
   should_stop_ = false;
   checker_thread_ = std::thread(&TribuneServer::periodicEventChecker, this);
+  ping_thread_ = std::thread(&TribuneServer::periodicPinger, this);
 
   svr_.listen(host_, port_);
 }
@@ -35,6 +36,9 @@ void TribuneServer::stop() {
   should_stop_ = true;
   if (checker_thread_.joinable()) {
     checker_thread_.join();
+  }
+  if (ping_thread_.joinable()) {
+    ping_thread_.join();
   }
   svr_.stop();
 }
@@ -61,6 +65,11 @@ void TribuneServer::setupRoutes() {
             DEBUG_DEBUG("PEERS: Received request: " << req.body);
             this->handleEndpointPeers(req, res);
           });
+  
+  svr_.Post("/ping",
+           [this](const httplib::Request &req, httplib::Response &res) {
+             this->handleEndpointPing(req, res);
+           });
 }
 
 void TribuneServer::handleEndpointPeers(const httplib::Request &req,
@@ -93,6 +102,7 @@ void TribuneServer::handleEndpointConnect(const httplib::Request &req,
 
     ClientState state(parsed_res.client_host, parsed_res.client_port,
                       parsed_res.client_id, parsed_res.ed25519_pub);
+    state.updatePingTime();
 
     DEBUG_INFO("Adding client to roster with ID: '" << parsed_res.client_id
                                                     << "'");
@@ -348,6 +358,26 @@ void TribuneServer::registerComputation(
   DEBUG_INFO("Server registered MPC computation: " << type);
 }
 
+void TribuneServer::handleEndpointPing(const httplib::Request &req,
+                                       httplib::Response &res) {
+  if (auto result = parseSubmitResponse(req.body)) {
+    EventResponse parsed_res = *result;
+    
+    std::unique_lock<std::shared_mutex> lock(roster_mutex_);
+    if (roster_.find(parsed_res.client_id) != roster_.end()) {
+      roster_[parsed_res.client_id].updatePingTime();
+      res.status = 200;
+      res.set_content("{\"status\":\"pong\"}", "application/json");
+    } else {
+      res.status = 404;
+      res.set_content("{\"error\":\"Client not found\"}", "application/json");
+    }
+  } else {
+    res.status = 400;
+    res.set_content("{\"error\":\"Invalid ping\"}", "application/json");
+  }
+}
+
 void TribuneServer::checkForCompleteResults() {
   std::shared_lock<std::shared_mutex> responses_lock(unprocessed_responses_mutex_);
   std::shared_lock<std::shared_mutex> events_lock(active_events_mutex_);
@@ -480,4 +510,57 @@ void TribuneServer::periodicEventChecker() {
   }
 
   DEBUG_INFO("Periodic event checker thread stopped");
+}
+
+void TribuneServer::periodicPinger() {
+  DEBUG_INFO("Started periodic ping thread");
+  
+  while (!should_stop_) {
+    std::this_thread::sleep_for(std::chrono::seconds(config_.ping_interval_seconds));
+    
+    if (should_stop_) break;
+    
+    std::vector<std::string> dead_clients;
+    {
+      std::shared_lock<std::shared_mutex> roster_lock(roster_mutex_);
+      for (const auto &[client_id, client_state] : roster_) {
+        if (!client_state.isAlive(config_.client_timeout_seconds)) {
+          dead_clients.push_back(client_id);
+        }
+      }
+    }
+    
+    if (!dead_clients.empty()) {
+      std::vector<std::string> removable_clients;
+      {
+        std::shared_lock<std::shared_mutex> events_lock(active_events_mutex_);
+        for (const std::string &client_id : dead_clients) {
+          bool in_active_event = false;
+          for (const auto &[event_id, active_event] : active_events_) {
+            for (const auto &participant : active_event.event.participants) {
+              if (participant.client_id == client_id) {
+                in_active_event = true;
+                break;
+              }
+            }
+            if (in_active_event) break;
+          }
+          
+          if (!in_active_event) {
+            removable_clients.push_back(client_id);
+          }
+        }
+      }
+      
+      if (!removable_clients.empty()) {
+        std::unique_lock<std::shared_mutex> lock(roster_mutex_);
+        for (const std::string &client_id : removable_clients) {
+          DEBUG_INFO("Removing dead client: " << client_id);
+          roster_.erase(client_id);
+        }
+      }
+    }
+  }
+  
+  DEBUG_INFO("Periodic ping thread stopped");
 }

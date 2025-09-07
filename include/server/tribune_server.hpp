@@ -67,6 +67,7 @@ private:
   void handleEndpointSubmit(const httplib::Request &, httplib::Response &);
   void handleEndpointConnect(const httplib::Request &, httplib::Response &);
   void handleEndpointPeers(const httplib::Request &, httplib::Response &);
+  void handleEndpointPing(const httplib::Request &, httplib::Response &);
 
   // Event/Response Aggregation/Processing
   // Read-heavy: multiple threads checking completion status
@@ -98,7 +99,10 @@ private:
   void checkForCompleteResults();
   void periodicEventChecker();
 
-  // Background thread for periodic checking
+  // Background threads
   std::thread checker_thread_;
+  std::thread ping_thread_;
   std::atomic<bool> should_stop_{false};
+  
+  void periodicPinger();
 };

@@ -46,6 +46,7 @@ public:
   const std::string &getClientId() const { return client_id_; }
   int getListenPort() const { return listen_port_; }
   const std::string &getListenHost() const { return listen_host_; }
+  bool isServerAlive() const { return server_alive_; }
 
 private:
   // Client identification
@@ -66,6 +67,11 @@ private:
   std::thread listener_thread_;
   std::atomic<bool> running_;
   httplib::Server event_server_;
+  
+  // Server health monitoring
+  std::atomic<bool> server_alive_{true};
+  std::thread health_checker_thread_;
+  void periodicHealthChecker();
 
   // Active events we're participating in (read-heavy: status checks, data collection)
   std::unordered_map<std::string, Event> active_events_;
