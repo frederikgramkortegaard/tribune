@@ -9,7 +9,7 @@
 
 TribuneServer::TribuneServer(const std::string &host, int port,
                              const ServerConfig &config)
-    : config_(config), host(host), port(port), rng_(rd_()) {
+    : config_(config), host_(host), port_(port), rng_(rd_()) {
   // Generate real Ed25519 keypair for server
   auto keypair = SignatureUtils::generateKeyPair();
   server_public_key_ = keypair.first;
@@ -21,13 +21,13 @@ TribuneServer::TribuneServer(const std::string &host, int port,
 
 TribuneServer::~TribuneServer() { stop(); }
 void TribuneServer::start() {
-  LOG("Starting aggregator server on http://" << host << ":" << port);
+  LOG("Starting aggregator server on http://" << host_ << ":" << port_);
 
   // Start periodic event checker thread
   should_stop_ = false;
   checker_thread_ = std::thread(&TribuneServer::periodicEventChecker, this);
 
-  svr.listen(host, port);
+  svr_.listen(host_, port_);
 }
 
 void TribuneServer::stop() {
@@ -35,27 +35,27 @@ void TribuneServer::stop() {
   if (checker_thread_.joinable()) {
     checker_thread_.join();
   }
-  svr.stop();
+  svr_.stop();
 }
 
 void TribuneServer::setupRoutes() {
   // Simple GET endpoint
-  svr.Get("/", [](const httplib::Request &, httplib::Response &res) {
+  svr_.Get("/", [](const httplib::Request &, httplib::Response &res) {
     res.set_content("Hello, World!", "text/plain");
   });
-  svr.Post("/connect",
+  svr_.Post("/connect",
            [this](const httplib::Request &req, httplib::Response &res) {
              DEBUG_INFO("CONNECT: Received data: " << req.body);
              this->handleEndpointConnect(req, res);
            });
 
-  svr.Post("/submit",
+  svr_.Post("/submit",
            [this](const httplib::Request &req, httplib::Response &res) {
              DEBUG_INFO("SUBMIT: Received data: " << req.body);
              this->handleEndpointSubmit(req, res);
            });
 
-  svr.Get("/peers",
+  svr_.Get("/peers",
           [this](const httplib::Request &req, httplib::Response &res) {
             DEBUG_DEBUG("PEERS: Received request: " << req.body);
             this->handleEndpointPeers(req, res);
@@ -69,12 +69,12 @@ void TribuneServer::handleEndpointPeers(const httplib::Request &req,
   bool first = true;
   {
     std::lock_guard<std::mutex> lock(roster_mutex_);
-    for (auto const &[key, val] : this->roster) {
+    for (auto const &[key, val] : this->roster_) {
       if (val.isClientParticipating()) {
         if (!first) {
           output += ",";
         }
-        output += std::format("\"{}:{}\"", val.client_host, val.client_port);
+        output += std::format("\"{}:{}\"", val.client_host_, val.client_port_);
         first = false;
       }
     }
@@ -100,8 +100,8 @@ void TribuneServer::handleEndpointConnect(const httplib::Request &req,
 
     {
       std::lock_guard<std::mutex> lock(roster_mutex_);
-      this->roster[parsed_res.client_id] = state;
-      DEBUG_DEBUG("Roster size after adding: " << this->roster.size());
+      this->roster_[parsed_res.client_id] = state;
+      DEBUG_DEBUG("Roster size after adding: " << this->roster_.size());
     }
 
     res.status = 200;
@@ -130,7 +130,7 @@ void TribuneServer::handleEndpointSubmit(const httplib::Request &req,
       std::lock_guard<std::mutex> responses_lock(unprocessed_responses_mutex_);
       std::lock_guard<std::mutex> events_lock(active_events_mutex_);
 
-      auto responses_it = unprocessed_responses.find(parsed_res.event_id);
+      auto responses_it = unprocessed_responses_.find(parsed_res.event_id);
       if (responses_it != unprocessed_responses.end()) {
         received_count = static_cast<int>(responses_it->second.size()) +
                          1; // +1 for current result
@@ -156,19 +156,19 @@ void TribuneServer::handleEndpointSubmit(const httplib::Request &req,
     {
       std::lock_guard<std::mutex> roster_lock(roster_mutex_);
       DEBUG_DEBUG("Current roster contents:");
-      for (const auto &[id, _] : this->roster) {
+      for (const auto &[id, _] : this->roster_) {
         DEBUG_DEBUG("  - '" << id << "'");
       }
 
-      if (this->roster.find(parsed_res.client_id) != this->roster.end()) {
+      if (this->roster_.find(parsed_res.client_id) != this->roster_.end()) {
         {
           std::lock_guard<std::mutex> responses_lock(
               unprocessed_responses_mutex_);
-          this->unprocessed_responses[parsed_res.event_id]
+          this->unprocessed_responses_[parsed_res.event_id]
                                      [parsed_res.client_id] = parsed_res;
         }
 
-        this->roster[parsed_res.client_id].markReceivedEvent();
+        this->roster_[parsed_res.client_id].markReceivedEvent();
 
         // Check if we can aggregate results for any completed events
         checkForCompleteResults();
@@ -220,16 +220,16 @@ void TribuneServer::announceEvent(const Event &event, std::string *result) {
   // Track this event as active
   {
     std::lock_guard<std::mutex> lock(active_events_mutex_);
-    active_events_.emplace(
-        event.event_id,
-        ActiveEvent{
-            .event_id = event.event_id,
-            .computation_type = event.computation_type,
-            .expected_participants = static_cast<int>(event.participants.size()),
-            .created_time = std::chrono::steady_clock::now(),
-            .result_ptr = result,
-            .event = event  // Store the actual event
-        });
+    active_events_.emplace(event.event_id,
+                           ActiveEvent{
+                               .event_id = event.event_id,
+                               .computation_type = event.computation_type,
+                               .expected_participants =
+                                   static_cast<int>(event.participants.size()),
+                               .created_time = std::chrono::steady_clock::now(),
+                               .result_ptr = result,
+                               .event = event // Store the actual event
+                           });
   }
 
   // Send event announcements with timeouts and controlled concurrency
@@ -282,13 +282,13 @@ std::vector<ClientInfo> TribuneServer::selectParticipants() {
   std::vector<ClientInfo> active_clients;
 
   std::lock_guard<std::mutex> lock(roster_mutex_);
-  for (const auto &[client_id, client_state] : roster) {
+  for (const auto &[client_id, client_state] : roster_) {
     if (client_state.isClientParticipating()) {
       ClientInfo info;
-      info.client_id = client_state.client_id;
-      info.client_host = client_state.client_host;
-      info.client_port = client_state.client_port;
-      info.ed25519_pub = client_state.ed25519_pub;
+      info.client_id = client_state.client_id_;
+      info.client_host = client_state.client_host_;
+      info.client_port = client_state.client_port_;
+      info.ed25519_pub = client_state.ed25519_pub_;
       active_clients.push_back(info);
     }
   }
@@ -423,7 +423,7 @@ void TribuneServer::periodicEventChecker() {
     if (should_stop_)
       break;
 
-    // Check for timeout events (events older than 30 seconds)
+    // Check for timeout events (events older than X seconds)
     auto now = std::chrono::steady_clock::now();
     std::vector<std::string> timed_out_events;
 
@@ -436,10 +436,11 @@ void TribuneServer::periodicEventChecker() {
             now - active_event.created_time);
 
         if (age.count() >
-            60) { // 60 second timeout for complex peer-to-peer operations
-          auto responses_it = unprocessed_responses.find(event_id);
+            config_.event_timeout_boundary) { // X second timeout for complex
+                                              // peer-to-peer operations
+          auto responses_it = unprocessed_responses_.find(event_id);
           int received_count =
-              responses_it != unprocessed_responses.end()
+              responses_it != unprocessed_responses_.end()
                   ? static_cast<int>(responses_it->second.size())
                   : 0;
 
@@ -454,7 +455,7 @@ void TribuneServer::periodicEventChecker() {
       // Clean up timed out events
       for (const std::string &event_id : timed_out_events) {
         active_events_.erase(event_id);
-        unprocessed_responses.erase(event_id);
+        unprocessed_responses_.erase(event_id);
       }
     }
 

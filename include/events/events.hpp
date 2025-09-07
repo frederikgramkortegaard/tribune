@@ -13,6 +13,12 @@ struct ClientInfo {
   std::string client_host;
   std::string client_port;
   std::string ed25519_pub;  // Public key for signature verification
+  
+  ClientInfo() = default;
+  ClientInfo(ClientInfo&&) noexcept = default;
+  ClientInfo& operator=(ClientInfo&&) noexcept = default;
+  ClientInfo(const ClientInfo&) = default;
+  ClientInfo& operator=(const ClientInfo&) = default;
 };
 
 struct Event {
@@ -25,6 +31,11 @@ struct Event {
   std::chrono::time_point<std::chrono::system_clock> timestamp;  // Event creation time
   
   Event() : timestamp(std::chrono::system_clock::now()), computation_metadata(nlohmann::json::object()) {}
+  
+  Event(Event&&) noexcept = default;
+  Event& operator=(Event&&) noexcept = default;
+  Event(const Event&) = default;
+  Event& operator=(const Event&) = default;
 };
 
 struct EventResponse {
@@ -33,6 +44,12 @@ struct EventResponse {
   std::string client_id;
   std::string data;
   std::chrono::time_point<std::chrono::system_clock> timestamp;
+  
+  EventResponse() = default;
+  EventResponse(EventResponse&&) noexcept = default;
+  EventResponse& operator=(EventResponse&&) noexcept = default;
+  EventResponse(const EventResponse&) = default;
+  EventResponse& operator=(const EventResponse&) = default;
 };
 
 struct ConnectResponse {
@@ -41,6 +58,12 @@ struct ConnectResponse {
   std::string client_port;
   std::string client_id;
   std::string ed25519_pub;
+  
+  ConnectResponse() = default;
+  ConnectResponse(ConnectResponse&&) noexcept = default;
+  ConnectResponse& operator=(ConnectResponse&&) noexcept = default;
+  ConnectResponse(const ConnectResponse&) = default;
+  ConnectResponse& operator=(const ConnectResponse&) = default;
 };
 
 struct PeerDataMessage {
@@ -50,6 +73,12 @@ struct PeerDataMessage {
   std::string signature;  // Ed25519 signature of (event_id + from_client + data)
   std::chrono::time_point<std::chrono::system_clock> timestamp;
   Event original_event;  // Include server-signed event for propagation
+  
+  PeerDataMessage() = default;
+  PeerDataMessage(PeerDataMessage&&) noexcept = default;
+  PeerDataMessage& operator=(PeerDataMessage&&) noexcept = default;
+  PeerDataMessage(const PeerDataMessage&) = default;
+  PeerDataMessage& operator=(const PeerDataMessage&) = default;
 };
 
 // JSON conversion functions for ClientInfo

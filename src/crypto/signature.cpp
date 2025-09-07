@@ -4,6 +4,7 @@
 #include <sodium.h>
 #include <vector>
 #include <stdexcept>
+#include <string_view>
 
 std::string SignatureUtils::createMessage(const std::string& event_id, const std::string& from_client, const std::string& data) {
     return event_id + "|" + from_client + "|" + data;
@@ -22,8 +23,8 @@ std::string SignatureUtils::createSignature(const std::string& message, const st
     
     std::vector<unsigned char> sk_bytes(crypto_sign_SECRETKEYBYTES);
     for (size_t i = 0; i < crypto_sign_SECRETKEYBYTES; ++i) {
-        std::string byte_str = private_key.substr(i * 2, 2);
-        sk_bytes[i] = static_cast<unsigned char>(std::stoi(byte_str, nullptr, 16));
+        std::string_view byte_str(private_key.data() + i * 2, 2);
+        sk_bytes[i] = static_cast<unsigned char>(std::stoi(std::string(byte_str), nullptr, 16));
     }
 
     // Create signature
@@ -72,15 +73,15 @@ bool SignatureUtils::verifySignature(const std::string& message, const std::stri
         // Convert hex public key to bytes
         std::vector<unsigned char> pk_bytes(crypto_sign_PUBLICKEYBYTES);
         for (size_t i = 0; i < crypto_sign_PUBLICKEYBYTES; ++i) {
-            std::string byte_str = public_key.substr(i * 2, 2);
-            pk_bytes[i] = static_cast<unsigned char>(std::stoi(byte_str, nullptr, 16));
+            std::string_view byte_str(public_key.data() + i * 2, 2);
+            pk_bytes[i] = static_cast<unsigned char>(std::stoi(std::string(byte_str), nullptr, 16));
         }
 
         // Convert hex signature to bytes
         std::vector<unsigned char> sig_bytes(crypto_sign_BYTES);
         for (size_t i = 0; i < crypto_sign_BYTES; ++i) {
-            std::string byte_str = signature.substr(i * 2, 2);
-            sig_bytes[i] = static_cast<unsigned char>(std::stoi(byte_str, nullptr, 16));
+            std::string_view byte_str(signature.data() + i * 2, 2);
+            sig_bytes[i] = static_cast<unsigned char>(std::stoi(std::string(byte_str), nullptr, 16));
         }
 
         // Verify signature

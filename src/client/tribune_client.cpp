@@ -30,6 +30,7 @@ TribuneClient::TribuneClient(const std::string &seed_host, int seed_port,
         SignatureUtils::generateKeyPair();
     ed25519_private_key_ = keyPair.first;
     ed25519_public_key_ = keyPair.second;
+    DEBUG_INFO("Public key: " << ed25519_public_key_);
   }
 
   setupEventRoutes();
@@ -406,12 +407,13 @@ void TribuneClient::onPeerDataReceived(const PeerDataMessage &peer_msg) {
     bool should_compute = false;
     {
       std::lock_guard<std::mutex> lock(computing_events_mutex_);
-      if (computing_events_.find(peer_msg.event_id) == computing_events_.end()) {
+      if (computing_events_.find(peer_msg.event_id) ==
+          computing_events_.end()) {
         computing_events_.insert(peer_msg.event_id);
         should_compute = true;
       }
     }
-    
+
     if (should_compute) {
       DEBUG_DEBUG("All shards received for event " << peer_msg.event_id
                                                    << ", starting computation");
@@ -424,7 +426,8 @@ void TribuneClient::onPeerDataReceived(const PeerDataMessage &peer_msg) {
         }
       }).detach();
     } else {
-      DEBUG_DEBUG("Computation already in progress for event " << peer_msg.event_id);
+      DEBUG_DEBUG("Computation already in progress for event "
+                  << peer_msg.event_id);
     }
   }
 
@@ -457,7 +460,8 @@ void TribuneClient::shareDataWithPeers(const Event &event,
       DEBUG_INFO("Split data into " << shards.size() << " shards for "
                                     << num_participants << " participants");
     } else {
-      DEBUG_ERROR("No MPC computation registered for type: " << event.computation_type);
+      DEBUG_ERROR(
+          "No MPC computation registered for type: " << event.computation_type);
       return;
     }
   }
@@ -555,7 +559,7 @@ void TribuneClient::shareDataWithPeers(const Event &event,
         should_compute = true;
       }
     }
-    
+
     if (should_compute) {
       DEBUG_DEBUG("All shards received for event "
                   << event.event_id
@@ -569,7 +573,8 @@ void TribuneClient::shareDataWithPeers(const Event &event,
         }
       }).detach();
     } else {
-      DEBUG_DEBUG("Computation already in progress for event " << event.event_id);
+      DEBUG_DEBUG("Computation already in progress for event "
+                  << event.event_id);
     }
   }
 }
@@ -601,15 +606,15 @@ bool TribuneClient::hasAllShards(const std::string &event_id) {
 
 void TribuneClient::computeAndSubmitResult(const std::string &event_id) {
   LOG("=== COMPUTING RESULT FOR EVENT: " << event_id << " ===");
-  
+
   // Run the computation
   std::string result = runComputation(event_id);
-  
+
   if (result.empty()) {
     DEBUG_ERROR("Computation failed for event: " << event_id);
     return;
   }
-  
+
   // Submit the result
   if (!submitResult(event_id, result)) {
     DEBUG_ERROR("Failed to submit result for event: " << event_id);
@@ -665,7 +670,8 @@ std::string TribuneClient::runComputation(const std::string &event_id) {
   return result;
 }
 
-bool TribuneClient::submitResult(const std::string &event_id, const std::string &result) {
+bool TribuneClient::submitResult(const std::string &event_id,
+                                 const std::string &result) {
   try {
     httplib::Client cli(seed_host_, seed_port_);
 

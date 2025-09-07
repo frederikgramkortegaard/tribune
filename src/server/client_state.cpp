@@ -1,7 +1,7 @@
 #include "server/client_state.hpp"
 
 void ClientState::markReceivedEvent() {
-    this->eventsSinceLastClientResponse = 0;
+    this->eventsSinceLastClientResponse_ = 0;
 }
 
 bool ClientState::isClientParticipating() const {

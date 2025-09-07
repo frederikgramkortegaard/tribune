@@ -45,6 +45,7 @@ else()
     message(FATAL_ERROR "libsodium not found")
 endif()
 
+set(FETCHCONTENT_QUIET FALSE)
 FetchContent_MakeAvailable(httplib nlohmann_json stduuid)
 
 # Include directories
@@ -76,7 +77,7 @@ target_include_directories(tribune_lib
 )
 
 # Optional: Create a simple test executable
-option(BUILD_EXAMPLES "Build example executables" ON)
+option(BUILD_EXAMPLES "Build example executables" OFF)
 
 if(BUILD_EXAMPLES)
     # Create a simple example executable to test compilation

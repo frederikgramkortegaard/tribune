@@ -9,20 +9,25 @@ enum ClientConnectionState {
 class ClientState {
 
 public:
-  ClientState() : eventsSinceLastClientResponse(0) {}
+  ClientState() noexcept : eventsSinceLastClientResponse_(0) {}
   ClientState(const std::string &host, const std::string &port,
               const std::string &id, const std::string &ed25519)
-      : client_host(host), client_port(port), client_id(id),
-        ed25519_pub(ed25519), eventsSinceLastClientResponse(0) {}
-  std::string client_host;
-  std::string client_port;
-  std::string client_id;
-  std::string ed25519_pub;
+      : client_host_(host), client_port_(port), client_id_(id),
+        ed25519_pub_(ed25519), eventsSinceLastClientResponse_(0) {}
+  
+  ClientState(ClientState&&) noexcept = default;
+  ClientState& operator=(ClientState&&) noexcept = default;
+  ClientState(const ClientState&) = default;
+  ClientState& operator=(const ClientState&) = default;
+  std::string client_host_;
+  std::string client_port_;
+  std::string client_id_;
+  std::string ed25519_pub_;
 
   bool isClientParticipating() const;
   void markReceivedEvent();
 
 private:
-  int eventsSinceLastClientResponse = 0;
+  int eventsSinceLastClientResponse_ = 0;
 };
 

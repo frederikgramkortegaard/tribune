@@ -47,9 +47,9 @@ private:
   std::string server_public_key_;
 
   // Meta
-  httplib::Server svr;
-  std::string host;
-  int port;
+  httplib::Server svr_;
+  std::string host_;
+  int port_;
 
   // Random number generation
   std::random_device rd_;
@@ -57,7 +57,7 @@ private:
   std::mutex rng_mutex_;
 
   // Transport Layer Management
-  std::unordered_map<std::string, ClientState> roster;
+  std::unordered_map<std::string, ClientState> roster_;
   std::mutex roster_mutex_;
 
   // Private Methods
@@ -69,10 +69,10 @@ private:
   // Event/Response Aggregation/Processing
   std::unordered_map<std::string,
                      std::unordered_map<std::string, EventResponse>>
-      unprocessed_responses;
+      unprocessed_responses_;
   std::mutex unprocessed_responses_mutex_;
-  std::queue<Event> pending_events;
-  std::mutex event_mutex;
+  std::queue<Event> pending_events_;
+  std::mutex event_mutex_;
 
   // MPC computations
   std::unordered_map<std::string, std::unique_ptr<MPCComputation>>
