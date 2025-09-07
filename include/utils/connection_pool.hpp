@@ -5,11 +5,12 @@
 #include <string>
 #include <unordered_map>
 #include <chrono>
+#include <variant>
 
 class ConnectionPool {
 private:
     struct PooledConnection {
-        std::unique_ptr<httplib::Client> client;
+        std::variant<std::unique_ptr<httplib::Client>, std::unique_ptr<httplib::SSLClient>> client;
         std::chrono::steady_clock::time_point last_used;
         std::string host;
         int port;
@@ -20,13 +21,17 @@ private:
             if (use_tls) {
                 auto ssl_client = std::make_unique<httplib::SSLClient>(host, port);
                 ssl_client->enable_server_certificate_verification(false);
+                ssl_client->set_connection_timeout(2, 0);
+                ssl_client->set_read_timeout(5, 0);
+                ssl_client->set_write_timeout(5, 0);
                 client = std::move(ssl_client);
             } else {
-                client = std::make_unique<httplib::Client>(host, port);
+                auto http_client = std::make_unique<httplib::Client>(host, port);
+                http_client->set_connection_timeout(2, 0);
+                http_client->set_read_timeout(5, 0);
+                http_client->set_write_timeout(5, 0);
+                client = std::move(http_client);
             }
-            client->set_connection_timeout(2, 0);
-            client->set_read_timeout(5, 0);
-            client->set_write_timeout(5, 0);
             last_used = std::chrono::steady_clock::now();
         }
         
@@ -54,26 +59,33 @@ private:
 public:
     void setUseTLS(bool use_tls) { use_tls_ = use_tls; }
     
-    httplib::Client* getConnection(const std::string& host, int port) {
+    template<typename Func>
+    auto withConnection(const std::string& host, int port, Func&& func) -> decltype(func(std::declval<httplib::Client*>())) {
         std::string key = makeKey(host, port);
         
+        std::shared_ptr<PooledConnection> conn;
         {
             std::shared_lock<std::shared_mutex> lock(connections_mutex_);
             auto it = connections_.find(key);
             if (it != connections_.end() && !it->second->isExpired(CONNECTION_TIMEOUT_SECONDS)) {
                 it->second->updateLastUsed();
-                return it->second->client.get();
+                conn = it->second;
             }
         }
         
-        {
+        if (!conn) {
             std::unique_lock<std::shared_mutex> lock(connections_mutex_);
             auto it = connections_.find(key);
             if (it == connections_.end() || it->second->isExpired(CONNECTION_TIMEOUT_SECONDS)) {
                 connections_[key] = std::make_shared<PooledConnection>(host, port, use_tls_);
             }
-            return connections_[key]->client.get();
+            conn = connections_[key];
         }
+        
+        // Call the function with the appropriate client type
+        return std::visit([&func](auto& client) {
+            return func(client.get());
+        }, conn->client);
     }
     
     void removeConnection(const std::string& host, int port) {

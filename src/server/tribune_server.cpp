@@ -269,21 +269,24 @@ void TribuneServer::announceEvent(const Event &event, std::string *result) {
     announcement_threads.emplace_back([this, participant, json_str,
                                        event_id = event.event_id]() {
       try {
-        auto* client = connection_pool_.getConnection(participant.client_host,
-                                                      std::stoi(participant.client_port));
-        auto res = client->Post("/event", json_str, "application/json");
+        connection_pool_.withConnection(participant.client_host,
+                                       std::stoi(participant.client_port),
+                                       [&](auto* client) {
+          auto res = client->Post("/event", json_str, "application/json");
 
-        if (res && res->status == 200) {
-          DEBUG_DEBUG("Sent Event with ID: " << event_id << ", to Client: "
-                                             << participant.client_host << ":"
-                                             << participant.client_port
-                                             << " - Status: " << res->status);
-        } else {
-          DEBUG_DEBUG(
-              "Failed to send Event to Client: "
-              << participant.client_host << ":" << participant.client_port
-              << (res ? " (Status: " + std::to_string(res->status) + ")" : ""));
-        }
+          if (res && res->status == 200) {
+            DEBUG_DEBUG("Sent Event with ID: " << event_id << ", to Client: "
+                                               << participant.client_host << ":"
+                                               << participant.client_port
+                                               << " - Status: " << res->status);
+          } else {
+            DEBUG_DEBUG(
+                "Failed to send Event to Client: "
+                << participant.client_host << ":" << participant.client_port
+                << (res ? " (Status: " + std::to_string(res->status) + ")" : ""));
+          }
+          return true;
+        });
       } catch (const std::exception &e) {
         DEBUG_ERROR("Exception sending event to "
                     << participant.client_host << ":" << participant.client_port

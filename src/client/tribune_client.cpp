@@ -74,15 +74,6 @@ std::string TribuneClient::generateUUID() {
 
 bool TribuneClient::connectToSeed() {
   try {
-    std::unique_ptr<httplib::Client> cli;
-    if (config_.use_tls) {
-      auto ssl_cli = std::make_unique<httplib::SSLClient>(seed_host_, seed_port_);
-      ssl_cli->enable_server_certificate_verification(config_.verify_server_cert);
-      cli = std::move(ssl_cli);
-    } else {
-      cli = std::make_unique<httplib::Client>(seed_host_, seed_port_);
-    }
-
     // Create connect request
     ConnectResponse connect_req;
     connect_req.type_ = ResponseType::ConnectionRequest;
@@ -96,7 +87,12 @@ bool TribuneClient::connectToSeed() {
     std::string json_body = j.dump();
 
     LOG("Connecting to seed node...");
-    auto res = cli->Post("/connect", json_body, "application/json");
+    
+    // Use connection pool for consistent TLS handling
+    auto res = connection_pool_.withConnection(seed_host_, seed_port_,
+                                              [&](auto* cli) {
+      return cli->Post("/connect", json_body, "application/json");
+    });
 
     if (res && res->status == 200) {
       LOG("Successfully connected to seed node!");
@@ -513,42 +509,44 @@ void TribuneClient::shareDataWithPeers(const Event &event,
                 << peer.client_host << ":" << peer.client_port);
 
     try {
-      auto* client = connection_pool_.getConnection(peer.client_host, std::stoi(peer.client_port));
+      connection_pool_.withConnection(peer.client_host, std::stoi(peer.client_port),
+                                     [&](auto* client) {
+        // Create data sharing payload with the specific shard for this peer
+        PeerDataMessage peer_msg;
+        peer_msg.event_id = event.event_id;
+        peer_msg.from_client = client_id_;
+        peer_msg.data =
+            shards[shard_index]; // Send the specific shard for this peer
+        peer_msg.timestamp = std::chrono::system_clock::now();
+        peer_msg.original_event =
+            event; // Include server-signed event for propagation
 
-      // Create data sharing payload with the specific shard for this peer
-      PeerDataMessage peer_msg;
-      peer_msg.event_id = event.event_id;
-      peer_msg.from_client = client_id_;
-      peer_msg.data =
-          shards[shard_index]; // Send the specific shard for this peer
-      peer_msg.timestamp = std::chrono::system_clock::now();
-      peer_msg.original_event =
-          event; // Include server-signed event for propagation
+        DEBUG_DEBUG("Creating peer message with event_id: " << peer_msg.event_id);
+        DEBUG_DEBUG("Original event ID: " << peer_msg.original_event.event_id);
+        DEBUG_DEBUG("Sending shard value: " << shards[shard_index]);
 
-      DEBUG_DEBUG("Creating peer message with event_id: " << peer_msg.event_id);
-      DEBUG_DEBUG("Original event ID: " << peer_msg.original_event.event_id);
-      DEBUG_DEBUG("Sending shard value: " << shards[shard_index]);
+        // Create signature
+        std::string message =
+            peer_msg.event_id + "|" + peer_msg.from_client + "|" + peer_msg.data;
+        peer_msg.signature =
+            SignatureUtils::createSignature(message, ed25519_private_key_);
 
-      // Create signature
-      std::string message =
-          peer_msg.event_id + "|" + peer_msg.from_client + "|" + peer_msg.data;
-      peer_msg.signature =
-          SignatureUtils::createSignature(message, ed25519_private_key_);
+        nlohmann::json payload = peer_msg;
 
-      nlohmann::json payload = peer_msg;
+        auto res = client->Post("/peer-data", payload.dump(), "application/json");
 
-      auto res = client->Post("/peer-data", payload.dump(), "application/json");
-
-      if (res && res->status == 200) {
-        LOG("SHARD_SENT: Successfully sent shard " << shard_index << " to "
-                                                   << peer.client_id);
-      } else {
-        DEBUG_ERROR("SHARD_FAILED: Failed to send shard "
-                    << shard_index << " to " << peer.client_id << " from "
-                    << client_id_ << " (status: "
-                    << (res ? std::to_string(res->status) : "no response")
-                    << ")");
-      }
+        if (res && res->status == 200) {
+          LOG("SHARD_SENT: Successfully sent shard " << shard_index << " to "
+                                                     << peer.client_id);
+        } else {
+          DEBUG_ERROR("SHARD_FAILED: Failed to send shard "
+                      << shard_index << " to " << peer.client_id << " from "
+                      << client_id_ << " (status: "
+                      << (res ? std::to_string(res->status) : "no response")
+                      << ")");
+        }
+        return true;
+      });
 
     } catch (const std::exception &e) {
       DEBUG_ERROR("SHARD_EXCEPTION: Exception sending shard "
@@ -757,15 +755,16 @@ void TribuneClient::periodicHealthChecker() {
     
     // Send ping to server
     try {
-      auto* client = connection_pool_.getConnection(seed_host_, seed_port_);
-      
-      EventResponse ping_msg;
-      ping_msg.type_ = Ping;
-      ping_msg.client_id = client_id_;
-      ping_msg.timestamp = std::chrono::system_clock::now();
-      
-      nlohmann::json j = ping_msg;
-      auto res = client->Post("/ping", j.dump(), "application/json");
+      auto res = connection_pool_.withConnection(seed_host_, seed_port_,
+                                                [&](auto* client) {
+        EventResponse ping_msg;
+        ping_msg.type_ = Ping;
+        ping_msg.client_id = client_id_;
+        ping_msg.timestamp = std::chrono::system_clock::now();
+        
+        nlohmann::json j = ping_msg;
+        return client->Post("/ping", j.dump(), "application/json");
+      });
       
       if (res && res->status == 200) {
         if (!server_alive_) {

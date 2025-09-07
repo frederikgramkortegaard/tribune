@@ -38,7 +38,7 @@ struct ServerConfig {
     client_timeout_seconds = 30;
     use_tls = false;
     cert_file = "";
-    private_key_file = ""
+    private_key_file = "";
     
     // Try to load from config file
     std::ifstream file(configFile);
