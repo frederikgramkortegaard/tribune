@@ -16,20 +16,33 @@ TribuneServer::TribuneServer(const std::string &host, int port,
   server_public_key_ = keypair.first;
   server_private_key_ = keypair.second;
 
+  // Configure connection pool for TLS if enabled
+  connection_pool_.setUseTLS(config_.use_tls);
+
   LOG("Server initialized with Ed25519 public key: " << server_public_key_);
-  setupRoutes();
 }
 
 TribuneServer::~TribuneServer() { stop(); }
 void TribuneServer::start() {
-  LOG("Starting aggregator server on http://" << host_ << ":" << port_);
-
   // Start periodic threads
   should_stop_ = false;
   checker_thread_ = std::thread(&TribuneServer::periodicEventChecker, this);
   ping_thread_ = std::thread(&TribuneServer::periodicPinger, this);
 
-  svr_.listen(host_, port_);
+  if (config_.use_tls) {
+    LOG("Starting aggregator server on https://" << host_ << ":" << port_);
+    ssl_svr_ = std::make_unique<httplib::SSLServer>(
+        config_.cert_file.c_str(), 
+        config_.private_key_file.c_str()
+    );
+    setupRoutesForServer(ssl_svr_.get());
+    ssl_svr_->listen(host_, port_);
+  } else {
+    LOG("Starting aggregator server on http://" << host_ << ":" << port_);
+    svr_ = std::make_unique<httplib::Server>();
+    setupRoutesForServer(svr_.get());
+    svr_->listen(host_, port_);
+  }
 }
 
 void TribuneServer::stop() {
@@ -40,37 +53,47 @@ void TribuneServer::stop() {
   if (ping_thread_.joinable()) {
     ping_thread_.join();
   }
-  svr_.stop();
+  if (ssl_svr_) {
+    ssl_svr_->stop();
+  }
+  if (svr_) {
+    svr_->stop();
+  }
 }
 
-void TribuneServer::setupRoutes() {
+template<typename ServerType>
+void TribuneServer::setupRoutesForServer(ServerType* server) {
   // Simple GET endpoint
-  svr_.Get("/", [](const httplib::Request &, httplib::Response &res) {
+  server->Get("/", [](const httplib::Request &, httplib::Response &res) {
     res.set_content("Hello, World!", "text/plain");
   });
-  svr_.Post("/connect",
+  server->Post("/connect",
            [this](const httplib::Request &req, httplib::Response &res) {
              DEBUG_INFO("CONNECT: Received data: " << req.body);
              this->handleEndpointConnect(req, res);
            });
 
-  svr_.Post("/submit",
+  server->Post("/submit",
            [this](const httplib::Request &req, httplib::Response &res) {
              DEBUG_INFO("SUBMIT: Received data: " << req.body);
              this->handleEndpointSubmit(req, res);
            });
 
-  svr_.Get("/peers",
+  server->Get("/peers",
           [this](const httplib::Request &req, httplib::Response &res) {
             DEBUG_DEBUG("PEERS: Received request: " << req.body);
             this->handleEndpointPeers(req, res);
           });
   
-  svr_.Post("/ping",
+  server->Post("/ping",
            [this](const httplib::Request &req, httplib::Response &res) {
              this->handleEndpointPing(req, res);
            });
 }
+
+// Explicit template instantiations
+template void TribuneServer::setupRoutesForServer<httplib::Server>(httplib::Server*);
+template void TribuneServer::setupRoutesForServer<httplib::SSLServer>(httplib::SSLServer*);
 
 void TribuneServer::handleEndpointPeers(const httplib::Request &req,
                                         httplib::Response &res) {

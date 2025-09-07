@@ -50,7 +50,6 @@ private:
   std::string server_public_key_;
 
   // Meta
-  httplib::Server svr_;
   std::string host_;
   int port_;
 
@@ -109,4 +108,12 @@ private:
   std::atomic<bool> should_stop_{false};
   
   void periodicPinger();
+  
+  // HTTP/HTTPS server instances
+  std::unique_ptr<httplib::Server> svr_;
+  std::unique_ptr<httplib::SSLServer> ssl_svr_;
+  
+  // Setup routes for either server type
+  template<typename ServerType>
+  void setupRoutesForServer(ServerType* server);
 };

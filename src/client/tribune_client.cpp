@@ -14,9 +14,10 @@
 TribuneClient::TribuneClient(const std::string &seed_host, int seed_port,
                              const std::string &listen_host, int listen_port,
                              const std::string &private_key,
-                             const std::string &public_key)
-    : seed_host_(seed_host), seed_port_(seed_port), listen_host_(listen_host),
-      listen_port_(listen_port), running_(false) {
+                             const std::string &public_key,
+                             const ClientConfig &config)
+    : config_(config), seed_host_(seed_host), seed_port_(seed_port), 
+      listen_host_(listen_host), listen_port_(listen_port), running_(false) {
 
   client_id_ = generateUUID();
 
@@ -34,6 +35,9 @@ TribuneClient::TribuneClient(const std::string &seed_host, int seed_port,
     DEBUG_INFO("Public key: " << ed25519_public_key_);
   }
 
+  // Configure connection pool for TLS if enabled
+  connection_pool_.setUseTLS(config_.use_tls);
+  
   setupEventRoutes();
 
   LOG("Created TribuneClient with ID: " << client_id_);
@@ -70,7 +74,14 @@ std::string TribuneClient::generateUUID() {
 
 bool TribuneClient::connectToSeed() {
   try {
-    httplib::Client cli(seed_host_, seed_port_);
+    std::unique_ptr<httplib::Client> cli;
+    if (config_.use_tls) {
+      auto ssl_cli = std::make_unique<httplib::SSLClient>(seed_host_, seed_port_);
+      ssl_cli->enable_server_certificate_verification(config_.verify_server_cert);
+      cli = std::move(ssl_cli);
+    } else {
+      cli = std::make_unique<httplib::Client>(seed_host_, seed_port_);
+    }
 
     // Create connect request
     ConnectResponse connect_req;
@@ -85,7 +96,7 @@ bool TribuneClient::connectToSeed() {
     std::string json_body = j.dump();
 
     LOG("Connecting to seed node...");
-    auto res = cli.Post("/connect", json_body, "application/json");
+    auto res = cli->Post("/connect", json_body, "application/json");
 
     if (res && res->status == 200) {
       LOG("Successfully connected to seed node!");

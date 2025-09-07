@@ -13,9 +13,17 @@ private:
         std::chrono::steady_clock::time_point last_used;
         std::string host;
         int port;
+        bool use_tls;
         
-        PooledConnection(const std::string& h, int p) : host(h), port(p) {
-            client = std::make_unique<httplib::Client>(host, port);
+        PooledConnection(const std::string& h, int p, bool tls = false) 
+            : host(h), port(p), use_tls(tls) {
+            if (use_tls) {
+                auto ssl_client = std::make_unique<httplib::SSLClient>(host, port);
+                ssl_client->enable_server_certificate_verification(false);
+                client = std::move(ssl_client);
+            } else {
+                client = std::make_unique<httplib::Client>(host, port);
+            }
             client->set_connection_timeout(2, 0);
             client->set_read_timeout(5, 0);
             client->set_write_timeout(5, 0);
@@ -37,12 +45,15 @@ private:
     std::shared_mutex connections_mutex_;
     
     static constexpr int CONNECTION_TIMEOUT_SECONDS = 60;
+    bool use_tls_ = false;
     
     std::string makeKey(const std::string& host, int port) const {
         return host + ":" + std::to_string(port);
     }
     
 public:
+    void setUseTLS(bool use_tls) { use_tls_ = use_tls; }
+    
     httplib::Client* getConnection(const std::string& host, int port) {
         std::string key = makeKey(host, port);
         
@@ -59,7 +70,7 @@ public:
             std::unique_lock<std::shared_mutex> lock(connections_mutex_);
             auto it = connections_.find(key);
             if (it == connections_.end() || it->second->isExpired(CONNECTION_TIMEOUT_SECONDS)) {
-                connections_[key] = std::make_shared<PooledConnection>(host, port);
+                connections_[key] = std::make_shared<PooledConnection>(host, port, use_tls_);
             }
             return connections_[key]->client.get();
         }

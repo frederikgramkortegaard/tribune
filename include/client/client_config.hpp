@@ -21,6 +21,10 @@ struct ClientConfig {
   int connection_timeout_seconds;
   int read_timeout_seconds;
   
+  // TLS settings
+  bool use_tls;
+  bool verify_server_cert;
+  
   ClientConfig(const std::string& configFile = "client.json") {
     // Set defaults
     server_host = "localhost";
@@ -31,6 +35,8 @@ struct ClientConfig {
     server_timeout_seconds = 30;
     connection_timeout_seconds = 2;
     read_timeout_seconds = 5;
+    use_tls = false;
+    verify_server_cert = true;
     
     // Try to load from config file
     std::ifstream file(configFile);
@@ -47,6 +53,8 @@ struct ClientConfig {
         if (config.contains("server_timeout_seconds")) server_timeout_seconds = config["server_timeout_seconds"];
         if (config.contains("connection_timeout_seconds")) connection_timeout_seconds = config["connection_timeout_seconds"];
         if (config.contains("read_timeout_seconds")) read_timeout_seconds = config["read_timeout_seconds"];
+        if (config.contains("use_tls")) use_tls = config["use_tls"];
+        if (config.contains("verify_server_cert")) verify_server_cert = config["verify_server_cert"];
         
         validate();
       } catch (const std::exception& e) {

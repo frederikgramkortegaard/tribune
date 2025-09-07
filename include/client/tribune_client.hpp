@@ -1,4 +1,5 @@
 #pragma once
+#include "client_config.hpp"
 #include "crypto/signature.hpp"
 #include "data_collection_module.hpp"
 #include "events/events.hpp"
@@ -21,7 +22,8 @@ public:
   TribuneClient(const std::string &seed_host, int seed_port,
                 const std::string &listen_host, int listen_port,
                 const std::string &private_key = "",
-                const std::string &public_key = "");
+                const std::string &public_key = "",
+                const ClientConfig &config = DEFAULT_CLIENT_CONFIG);
   ~TribuneClient();
 
   // Core functionality
@@ -58,6 +60,9 @@ private:
       server_public_key_; // Server's public key for signature verification
   std::string generateUUID();
 
+  // Configuration
+  ClientConfig config_;
+  
   // Network configuration
   std::string seed_host_;
   int seed_port_;

@@ -21,6 +21,11 @@ struct ServerConfig {
   int ping_interval_seconds;
   int client_timeout_seconds;
   
+  // TLS settings
+  bool use_tls;
+  std::string cert_file;
+  std::string private_key_file;
+  
   ServerConfig(const std::string& configFile = "server.json") {
     // Set defaults
     host = "localhost";
@@ -31,6 +36,9 @@ struct ServerConfig {
     event_timeout_boundary = 120;
     ping_interval_seconds = 10;
     client_timeout_seconds = 30;
+    use_tls = false;
+    cert_file = "";
+    private_key_file = ""
     
     // Try to load from config file
     std::ifstream file(configFile);
@@ -47,6 +55,9 @@ struct ServerConfig {
         if (config.contains("event_timeout_boundary")) event_timeout_boundary = config["event_timeout_boundary"];
         if (config.contains("ping_interval_seconds")) ping_interval_seconds = config["ping_interval_seconds"];
         if (config.contains("client_timeout_seconds")) client_timeout_seconds = config["client_timeout_seconds"];
+        if (config.contains("use_tls")) use_tls = config["use_tls"];
+        if (config.contains("cert_file")) cert_file = config["cert_file"];
+        if (config.contains("private_key_file")) private_key_file = config["private_key_file"];
         
         validate();
       } catch (const std::exception& e) {
@@ -89,6 +100,12 @@ private:
     
     if (host.empty()) {
       throw std::invalid_argument("Host cannot be empty");
+    }
+    
+    if (use_tls) {
+      if (cert_file.empty() || private_key_file.empty()) {
+        throw std::invalid_argument("TLS enabled but cert_file or private_key_file not provided");
+      }
     }
   }
 };
