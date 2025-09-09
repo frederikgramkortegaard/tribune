@@ -3,7 +3,7 @@
 #include "crypto/signature.hpp"
 #include "data_collection_module.hpp"
 #include "events/events.hpp"
-#include "mpc/mpc_computation.hpp"
+#include "mpc/mpc_module.hpp"
 #include "utils/connection_pool.hpp"
 #include <atomic>
 #include <chrono>
@@ -34,9 +34,9 @@ public:
   // Data collection module management
   void setDataCollectionModule(std::unique_ptr<DataCollectionModule> module);
 
-  // MPC computation management
-  void registerComputation(const std::string &type,
-                           std::unique_ptr<MPCComputation> computation);
+  // MPC module management
+  void registerModule(const std::string &type,
+                     std::unique_ptr<MPCModule> module);
 
   // Event handling
   void onEventAnnouncement(const Event &event, bool relay = true);
@@ -95,10 +95,10 @@ private:
   std::unique_ptr<DataCollectionModule> data_module_;
   std::mutex data_module_mutex_;
 
-  // MPC computations (read-heavy: computation lookups)
-  std::unordered_map<std::string, std::unique_ptr<MPCComputation>>
-      computations_;
-  std::shared_mutex computations_mutex_;
+  // MPC modules
+  std::unordered_map<std::string, std::unique_ptr<MPCModule>>
+      modules_;
+  std::shared_mutex modules_mutex_;
   
   // Track events currently being computed to prevent duplicate computation threads
   std::unordered_set<std::string> computing_events_;

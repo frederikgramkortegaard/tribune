@@ -29,6 +29,7 @@ void TribuneServer::start() {
   checker_thread_ = std::thread(&TribuneServer::periodicEventChecker, this);
   ping_thread_ = std::thread(&TribuneServer::periodicPinger, this);
 
+#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
   if (config_.use_tls) {
     LOG("Starting aggregator server on https://" << host_ << ":" << port_);
     ssl_svr_ = std::make_unique<httplib::SSLServer>(
@@ -38,11 +39,14 @@ void TribuneServer::start() {
     setupRoutesForServer(ssl_svr_.get());
     ssl_svr_->listen(host_, port_);
   } else {
+#endif
     LOG("Starting aggregator server on http://" << host_ << ":" << port_);
     svr_ = std::make_unique<httplib::Server>();
     setupRoutesForServer(svr_.get());
     svr_->listen(host_, port_);
+#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
   }
+#endif
 }
 
 void TribuneServer::stop() {
@@ -53,9 +57,11 @@ void TribuneServer::stop() {
   if (ping_thread_.joinable()) {
     ping_thread_.join();
   }
+#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
   if (ssl_svr_) {
     ssl_svr_->stop();
   }
+#endif
   if (svr_) {
     svr_->stop();
   }
@@ -93,7 +99,9 @@ void TribuneServer::setupRoutesForServer(ServerType* server) {
 
 // Explicit template instantiations
 template void TribuneServer::setupRoutesForServer<httplib::Server>(httplib::Server*);
+#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
 template void TribuneServer::setupRoutesForServer<httplib::SSLServer>(httplib::SSLServer*);
+#endif
 
 void TribuneServer::handleEndpointPeers(const httplib::Request &req,
                                         httplib::Response &res) {
@@ -373,10 +381,10 @@ TribuneServer::createEvent(EventType type, const std::string &event_id,
   return event;
 }
 
-void TribuneServer::registerComputation(
-    const std::string &type, std::unique_ptr<MPCComputation> computation) {
-  std::unique_lock<std::shared_mutex> lock(computations_mutex_);
-  computations_[type] = std::move(computation);
+void TribuneServer::registerModule(
+    const std::string &type, std::unique_ptr<MPCModule> module) {
+  std::unique_lock<std::shared_mutex> lock(modules_mutex_);
+  modules_[type] = std::move(module);
   DEBUG_INFO("Server registered MPC computation: " << type);
 }
 
@@ -427,12 +435,23 @@ void TribuneServer::checkForCompleteResults() {
                            << "/" << active_event.expected_participants
                            << " responses)");
 
-      std::shared_lock<std::shared_mutex> comp_lock(computations_mutex_);
-      auto comp_it = computations_.find(active_event.computation_type);
+      std::shared_lock<std::shared_mutex> mod_lock(modules_mutex_);
+      auto mod_it = modules_.find(active_event.computation_type);
 
-      if (comp_it != computations_.end()) {
-        std::string final_result =
-            comp_it->second->aggregateResults(results, active_event.event);
+      if (mod_it != modules_.end()) {
+        // Convert string results to PartialResult objects
+        std::vector<PartialResult> partials;
+        for (size_t i = 0; i < results.size(); i++) {
+          PartialResult partial;
+          partial.participant_id = "participant_" + std::to_string(i);
+          partial.value = nlohmann::json::parse(results[i]);
+          partials.push_back(partial);
+        }
+        
+        // Aggregate the partial results
+        FinalResult final = mod_it->second->aggregate(partials, &active_event.event);
+        std::string final_result = final.value.dump();
+        
         DEBUG_DEBUG("=== FINAL MPC RESULT ===");
         DEBUG_DEBUG("Event: " << event_id);
         DEBUG_DEBUG("Computation: " << active_event.computation_type);
@@ -444,7 +463,7 @@ void TribuneServer::checkForCompleteResults() {
           *active_event.result_ptr = final_result;
         }
       } else {
-        DEBUG_DEBUG("No computation handler for type: "
+        DEBUG_DEBUG("No module handler for type: "
                     << active_event.computation_type);
       }
 

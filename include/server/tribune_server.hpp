@@ -1,7 +1,7 @@
 #pragma once
 #include "client_state.hpp"
 #include "events/events.hpp"
-#include "mpc/mpc_computation.hpp"
+#include "mpc/mpc_module.hpp"
 #include "server_config.hpp"
 #include "utils/connection_pool.hpp"
 #include <algorithm>
@@ -32,9 +32,9 @@ public:
   std::optional<Event> createEvent(EventType type, const std::string &event_id,
                                    const std::string &computation_type = "sum");
 
-  // MPC computation management
-  void registerComputation(const std::string &type,
-                           std::unique_ptr<MPCComputation> computation);
+  // MPC module management
+  void registerModule(const std::string &type,
+                     std::unique_ptr<MPCModule> module);
 
   // Server identity
   const std::string &getServerPublicKey() const { return server_public_key_; }
@@ -81,10 +81,10 @@ private:
   std::queue<Event> pending_events_;
   std::mutex event_mutex_;
 
-  // MPC computations (read-heavy: lookups during event processing)
-  std::unordered_map<std::string, std::unique_ptr<MPCComputation>>
-      computations_;
-  std::shared_mutex computations_mutex_;
+  // MPC modules
+  std::unordered_map<std::string, std::unique_ptr<MPCModule>>
+      modules_;
+  std::shared_mutex modules_mutex_;
 
   // Active event tracking (read-heavy: status checks, completion monitoring)
   struct ActiveEvent {
@@ -111,7 +111,9 @@ private:
   
   // HTTP/HTTPS server instances
   std::unique_ptr<httplib::Server> svr_;
+#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
   std::unique_ptr<httplib::SSLServer> ssl_svr_;
+#endif
   
   // Setup routes for either server type
   template<typename ServerType>

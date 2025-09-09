@@ -10,7 +10,11 @@
 class ConnectionPool {
 private:
     struct PooledConnection {
+#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
         std::variant<std::unique_ptr<httplib::Client>, std::unique_ptr<httplib::SSLClient>> client;
+#else
+        std::unique_ptr<httplib::Client> client;
+#endif
         std::chrono::steady_clock::time_point last_used;
         std::string host;
         int port;
@@ -18,6 +22,7 @@ private:
         
         PooledConnection(const std::string& h, int p, bool tls = false) 
             : host(h), port(p), use_tls(tls) {
+#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
             if (use_tls) {
                 auto ssl_client = std::make_unique<httplib::SSLClient>(host, port);
                 ssl_client->enable_server_certificate_verification(false);
@@ -32,6 +37,14 @@ private:
                 http_client->set_write_timeout(5, 0);
                 client = std::move(http_client);
             }
+#else
+            // SSL not supported, only HTTP
+            auto http_client = std::make_unique<httplib::Client>(host, port);
+            http_client->set_connection_timeout(2, 0);
+            http_client->set_read_timeout(5, 0);
+            http_client->set_write_timeout(5, 0);
+            client = std::move(http_client);
+#endif
             last_used = std::chrono::steady_clock::now();
         }
         
@@ -83,9 +96,13 @@ public:
         }
         
         // Call the function with the appropriate client type
+#ifdef CPPHTTPLIB_OPENSSL_SUPPORT
         return std::visit([&func](auto& client) {
             return func(client.get());
         }, conn->client);
+#else
+        return func(conn->client.get());
+#endif
     }
     
     void removeConnection(const std::string& host, int port) {

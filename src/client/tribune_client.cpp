@@ -16,7 +16,7 @@ TribuneClient::TribuneClient(const std::string &seed_host, int seed_port,
                              const std::string &private_key,
                              const std::string &public_key,
                              const ClientConfig &config)
-    : config_(config), seed_host_(seed_host), seed_port_(seed_port), 
+    : config_(config), seed_host_(seed_host), seed_port_(seed_port),
       listen_host_(listen_host), listen_port_(listen_port), running_(false) {
 
   client_id_ = generateUUID();
@@ -37,7 +37,7 @@ TribuneClient::TribuneClient(const std::string &seed_host, int seed_port,
 
   // Configure connection pool for TLS if enabled
   connection_pool_.setUseTLS(config_.use_tls);
-  
+
   setupEventRoutes();
 
   LOG("Created TribuneClient with ID: " << client_id_);
@@ -54,12 +54,11 @@ void TribuneClient::setDataCollectionModule(
   DEBUG_INFO("Data collection module updated");
 }
 
-void TribuneClient::registerComputation(
-    const std::string &type, std::unique_ptr<MPCComputation> computation) {
-  // WRITE operation - registering new computation type
-  std::unique_lock<std::shared_mutex> lock(computations_mutex_);
-  computations_[type] = std::move(computation);
-  DEBUG_INFO("Registered MPC computation: " << type);
+void TribuneClient::registerModule(const std::string &type,
+                                   std::unique_ptr<MPCModule> module) {
+  std::unique_lock<std::shared_mutex> lock(modules_mutex_);
+  modules_[type] = std::move(module);
+  DEBUG_INFO("Registered MPC module: " << type);
 }
 
 std::string TribuneClient::generateUUID() {
@@ -87,12 +86,12 @@ bool TribuneClient::connectToSeed() {
     std::string json_body = j.dump();
 
     LOG("Connecting to seed node...");
-    
+
     // Use connection pool for consistent TLS handling
-    auto res = connection_pool_.withConnection(seed_host_, seed_port_,
-                                              [&](auto* cli) {
-      return cli->Post("/connect", json_body, "application/json");
-    });
+    auto res =
+        connection_pool_.withConnection(seed_host_, seed_port_, [&](auto *cli) {
+          return cli->Post("/connect", json_body, "application/json");
+        });
 
     if (res && res->status == 200) {
       LOG("Successfully connected to seed node!");
@@ -155,7 +154,7 @@ void TribuneClient::setupEventRoutes() {
                           "application/json");
         }
       });
-  
+
   event_server_.Post(
       "/ping", [this](const httplib::Request &req, httplib::Response &res) {
         res.status = 200;
@@ -215,7 +214,8 @@ void TribuneClient::startListening() {
 
   running_ = true;
   listener_thread_ = std::thread(&TribuneClient::runEventListener, this);
-  health_checker_thread_ = std::thread(&TribuneClient::periodicHealthChecker, this);
+  health_checker_thread_ =
+      std::thread(&TribuneClient::periodicHealthChecker, this);
   LOG("Started event listener on port " << listen_port_);
 }
 
@@ -466,18 +466,26 @@ void TribuneClient::shareDataWithPeers(const Event &event,
     return;
   }
 
-  // Generate shards using the MPC computation
-  std::vector<std::string> shards;
+  // Generate shards using the MPC module
+  std::vector<DataShard> data_shards;
+  std::vector<std::string> shards;  // Keep for compatibility with peer messaging
   {
-    std::unique_lock<std::shared_mutex> lock(computations_mutex_);
-    auto comp_it = computations_.find(event.computation_type);
-    if (comp_it != computations_.end()) {
-      shards = comp_it->second->shardData(my_data, event);
-      DEBUG_INFO("Split data into " << shards.size() << " shards for "
+    std::unique_lock<std::shared_mutex> lock(modules_mutex_);
+    auto mod_it = modules_.find(event.computation_type);
+    if (mod_it != modules_.end()) {
+      data_shards = mod_it->second->shardData(my_data, &event);
+      
+      // Apply masking to shards and convert to string for transmission
+      auto masked_shards = mod_it->second->maskShards(data_shards, &event, client_id_);
+      for (const auto& shard : masked_shards) {
+        shards.push_back(shard.data);
+      }
+      
+      DEBUG_INFO("Split data into " << data_shards.size() << " shards for "
                                     << num_participants << " participants");
     } else {
       DEBUG_ERROR(
-          "No MPC computation registered for type: " << event.computation_type);
+          "No MPC module registered for type: " << event.computation_type);
       return;
     }
   }
@@ -509,44 +517,47 @@ void TribuneClient::shareDataWithPeers(const Event &event,
                 << peer.client_host << ":" << peer.client_port);
 
     try {
-      connection_pool_.withConnection(peer.client_host, std::stoi(peer.client_port),
-                                     [&](auto* client) {
-        // Create data sharing payload with the specific shard for this peer
-        PeerDataMessage peer_msg;
-        peer_msg.event_id = event.event_id;
-        peer_msg.from_client = client_id_;
-        peer_msg.data =
-            shards[shard_index]; // Send the specific shard for this peer
-        peer_msg.timestamp = std::chrono::system_clock::now();
-        peer_msg.original_event =
-            event; // Include server-signed event for propagation
+      connection_pool_.withConnection(
+          peer.client_host, std::stoi(peer.client_port), [&](auto *client) {
+            // Create data sharing payload with the specific shard for this peer
+            PeerDataMessage peer_msg;
+            peer_msg.event_id = event.event_id;
+            peer_msg.from_client = client_id_;
+            peer_msg.data =
+                shards[shard_index]; // Send the specific shard for this peer
+            peer_msg.timestamp = std::chrono::system_clock::now();
+            peer_msg.original_event =
+                event; // Include server-signed event for propagation
 
-        DEBUG_DEBUG("Creating peer message with event_id: " << peer_msg.event_id);
-        DEBUG_DEBUG("Original event ID: " << peer_msg.original_event.event_id);
-        DEBUG_DEBUG("Sending shard value: " << shards[shard_index]);
+            DEBUG_DEBUG(
+                "Creating peer message with event_id: " << peer_msg.event_id);
+            DEBUG_DEBUG(
+                "Original event ID: " << peer_msg.original_event.event_id);
+            DEBUG_DEBUG("Sending shard value: " << shards[shard_index]);
 
-        // Create signature
-        std::string message =
-            peer_msg.event_id + "|" + peer_msg.from_client + "|" + peer_msg.data;
-        peer_msg.signature =
-            SignatureUtils::createSignature(message, ed25519_private_key_);
+            // Create signature
+            std::string message = peer_msg.event_id + "|" +
+                                  peer_msg.from_client + "|" + peer_msg.data;
+            peer_msg.signature =
+                SignatureUtils::createSignature(message, ed25519_private_key_);
 
-        nlohmann::json payload = peer_msg;
+            nlohmann::json payload = peer_msg;
 
-        auto res = client->Post("/peer-data", payload.dump(), "application/json");
+            auto res =
+                client->Post("/peer-data", payload.dump(), "application/json");
 
-        if (res && res->status == 200) {
-          LOG("SHARD_SENT: Successfully sent shard " << shard_index << " to "
-                                                     << peer.client_id);
-        } else {
-          DEBUG_ERROR("SHARD_FAILED: Failed to send shard "
-                      << shard_index << " to " << peer.client_id << " from "
-                      << client_id_ << " (status: "
-                      << (res ? std::to_string(res->status) : "no response")
-                      << ")");
-        }
-        return true;
-      });
+            if (res && res->status == 200) {
+              LOG("SHARD_SENT: Successfully sent shard "
+                  << shard_index << " to " << peer.client_id);
+            } else {
+              DEBUG_ERROR("SHARD_FAILED: Failed to send shard "
+                          << shard_index << " to " << peer.client_id << " from "
+                          << client_id_ << " (status: "
+                          << (res ? std::to_string(res->status) : "no response")
+                          << ")");
+            }
+            return true;
+          });
 
     } catch (const std::exception &e) {
       DEBUG_ERROR("SHARD_EXCEPTION: Exception sending shard "
@@ -672,16 +683,27 @@ std::string TribuneClient::runComputation(const std::string &event_id) {
   // Find and execute computation
   std::string result;
   {
-    std::shared_lock<std::shared_mutex> comp_lock(computations_mutex_);
-    auto comp_it = computations_.find(computation_type);
+    std::shared_lock<std::shared_mutex> mod_lock(modules_mutex_);
+    auto mod_it = modules_.find(computation_type);
 
-    if (comp_it == computations_.end()) {
+    if (mod_it == modules_.end()) {
       DEBUG_ERROR(
-          "Error: No computation registered for type: " << computation_type);
+          "Error: No module registered for type: " << computation_type);
       return "";
     }
 
-    result = comp_it->second->compute(shards, event);
+    // Convert collected shards to DataShard objects for computation
+    std::vector<DataShard> collected_shards;
+    for (size_t i = 0; i < shards.size(); i++) {
+      DataShard shard;
+      shard.participant_id = "participant_" + std::to_string(i);  // Could be improved with actual IDs
+      shard.data = shards[i];
+      shard.shard_index = i;
+      collected_shards.push_back(shard);
+    }
+    
+    PartialResult partial = mod_it->second->computePartial(&event, collected_shards);
+    result = partial.value.dump();  // Convert JSON result to string
   }
 
   LOG("Computation complete! Result: " << result);
@@ -744,28 +766,29 @@ void TribuneClient::stop() {
 
 void TribuneClient::periodicHealthChecker() {
   DEBUG_INFO("Started health checker thread");
-  
+
   while (running_) {
     std::this_thread::sleep_for(std::chrono::seconds(10));
-    
-    if (!running_) break;
-    
+
+    if (!running_)
+      break;
+
     // Clean up expired connections
     connection_pool_.cleanupExpiredConnections();
-    
+
     // Send ping to server
     try {
-      auto res = connection_pool_.withConnection(seed_host_, seed_port_,
-                                                [&](auto* client) {
-        EventResponse ping_msg;
-        ping_msg.type_ = Ping;
-        ping_msg.client_id = client_id_;
-        ping_msg.timestamp = std::chrono::system_clock::now();
-        
-        nlohmann::json j = ping_msg;
-        return client->Post("/ping", j.dump(), "application/json");
-      });
-      
+      auto res = connection_pool_.withConnection(
+          seed_host_, seed_port_, [&](auto *client) {
+            EventResponse ping_msg;
+            ping_msg.type_ = Ping;
+            ping_msg.client_id = client_id_;
+            ping_msg.timestamp = std::chrono::system_clock::now();
+
+            nlohmann::json j = ping_msg;
+            return client->Post("/ping", j.dump(), "application/json");
+          });
+
       if (res && res->status == 200) {
         if (!server_alive_) {
           DEBUG_INFO("Server connection restored");
@@ -788,7 +811,7 @@ void TribuneClient::periodicHealthChecker() {
       }
     }
   }
-  
+
   DEBUG_INFO("Stopped health checker thread");
 }
 

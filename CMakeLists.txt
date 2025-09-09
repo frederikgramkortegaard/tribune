@@ -10,6 +10,11 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     message(STATUS "Debug logging enabled")
 endif()
 
+# Disable SSL support completely for simplicity
+add_definitions(-DCPPHTTPLIB_NO_OPENSSL)
+add_definitions(-DCPPHTTPLIB_NO_BROTLI)
+add_definitions(-DCPPHTTPLIB_NO_ZLIB)
+
 # Fetch dependencies
 include(FetchContent)
 
@@ -18,6 +23,11 @@ FetchContent_Declare(
   GIT_REPOSITORY https://github.com/yhirose/cpp-httplib.git
   GIT_TAG        v0.15.3
 )
+
+# Set httplib options before making it available
+set(HTTPLIB_NO_OPENSSL ON CACHE BOOL "Disable OpenSSL")
+set(HTTPLIB_NO_BROTLI ON CACHE BOOL "Disable Brotli")
+set(HTTPLIB_NO_ZLIB ON CACHE BOOL "Disable Zlib")
 
 FetchContent_Declare(
   nlohmann_json
