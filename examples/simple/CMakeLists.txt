@@ -30,8 +30,10 @@ include_directories("${TRIBUNE_ROOT}/_deps/stduuid-src/include")
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Disable OpenSSL support for simple example
-# add_definitions(-DCPPHTTPLIB_OPENSSL_SUPPORT)
+# Disable OpenSSL/compression support for simple example
+add_definitions(-DCPPHTTPLIB_NO_OPENSSL)
+add_definitions(-DCPPHTTPLIB_NO_BROTLI)
+add_definitions(-DCPPHTTPLIB_NO_ZLIB)
 
 # Find libsodium
 find_path(SODIUM_INCLUDE_DIR sodium.h)

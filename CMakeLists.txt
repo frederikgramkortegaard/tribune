@@ -79,6 +79,13 @@ target_link_libraries(tribune_lib
         ${SODIUM_LIBRARY}
 )
 
+# Add compile definitions to disable SSL/compression in httplib
+target_compile_definitions(tribune_lib PUBLIC 
+    CPPHTTPLIB_NO_OPENSSL
+    CPPHTTPLIB_NO_BROTLI
+    CPPHTTPLIB_NO_ZLIB
+)
+
 # Set include directories for the library
 target_include_directories(tribune_lib 
     PUBLIC 
