@@ -1,4 +1,0 @@
-/Users/fgk/Developer/tribune/examples/simple/CMakeFiles/simple_server.dir
-/Users/fgk/Developer/tribune/examples/simple/CMakeFiles/simple_client.dir
-/Users/fgk/Developer/tribune/examples/simple/CMakeFiles/edit_cache.dir
-/Users/fgk/Developer/tribune/examples/simple/CMakeFiles/rebuild_cache.dir
