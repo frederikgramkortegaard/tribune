@@ -1,1 +1,0 @@
-/usr/bin/c++  -arch arm64 -Wl,-search_paths_first -Wl,-headerpad_max_install_names CMakeFiles/simple_client.dir/client.cpp.o -o simple_client  /Users/fgk/Developer/tribune/build/libtribune_lib.a /opt/homebrew/lib/libsodium.dylib -lpthread
