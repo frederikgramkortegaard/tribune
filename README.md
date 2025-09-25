@@ -3,6 +3,8 @@
 A distributed Multi-Party Computation (MPC) system for secure collaborative data processing.
 # Tribune - Distributed Multi-Party Computation Library
 
+NOTICE: This is WIP, it's being overhauled, it's a project for learning, so I often revamp it, and the repository might not reflect a useable state...
+
 Tribune is a C++ library for distributed multi-party computation with P2P networking, enabling privacy-preserving machine learning training without sharing raw data. Built around a star topology architecture where clients coordinate through a central server while keeping their data local.
 
 The system allows multiple parties to collaboratively train ML models, perform secure aggregations, and run distributed computations where no single party ever sees the complete dataset. Applications include federated learning scenarios, collaborative analytics, and any use case requiring computation over distributed private data.
