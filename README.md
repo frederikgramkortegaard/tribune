@@ -9,15 +9,6 @@ The system allows multiple parties to collaboratively train ML models, perform s
 
 :speech_balloon: **Security Model:** This uses a star topology with centralized coordination, which has obvious trust and single-point-of-failure issues. We assume an honest-but-curious adversary model - the server coordinates but doesn't see raw client data. Not suitable for truly adversarial environments where you can't trust the coordinator.
 
-## Federated Learning Demo
-
-This repository includes a **complete federated learning implementation** demonstrating privacy-preserving collaborative model training. Multiple clients train a shared logistic regression model using secure aggregation with pairwise masking - ensuring no client ever sees another's data.
-
-**Quick demo:** `python3 apps/federated-machinelearning/scripts/run_demo.py`  
-*(The script will automatically build the executables if needed - requires CMake and a C++ compiler)*
-
-Work In Progrss Notice: The implementation shows real-world federated learning with gradient computation, secure aggregation, and distributed training rounds. See [`apps/federated-machinelearning/`](apps/federated-machinelearning/) for details.
-
 ## Architecture
 
 The `src/` directory contains the core library for distributed MPC. Public API includes:
@@ -34,13 +25,6 @@ The `apps/` directory contains example applications:
 - `server_app` - Basic server that creates and announces computation events
 - `client_app` - Simple client that connects and listens for events
 - `MockDataCollectionModule` - Example data collection implementation for testing
-
-**`apps/federated-machinelearning/`** - Privacy-preserving federated learning demo:
-- Demonstrates collaborative training of a logistic regression model
-- Implements secure aggregation with pairwise masking
-- Includes complete working example with multiple clients training a logout prediction model
-- Run with: `python3 apps/federated-machinelearning/scripts/run_demo.py`
-
 
 ## Quick Start
 
